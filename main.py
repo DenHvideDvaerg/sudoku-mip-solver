@@ -37,6 +37,28 @@ if has_solution:
     for row in solver.current_solution:
         print(row)
 
+print("From string...")
+sudoku_string = "700006200080001007046070300060090000050040020000010040009020570500100080008900003"
+solver = SudokuMIPSolver.from_string(sudoku_string, width, height)
+
+solver.pretty_print(solver.board)
+
+solver.solve()
+print("\nSudoku solved from string:")
+for row in solver.current_solution:
+    print(row)
+
+print("\nPretty print:")
+solver.pretty_print(solver.current_solution)
+
+print("Pretty print with more than 9 values:")
+solver = SudokuMIPSolver(Sudoku(width=4, height=4).difficulty(0.5).board, 4, 4)
+solver.pretty_print(solver.board)   
+
+solver.solve()
+print("\nSudoku solved from 4x4 board:")
+solver.pretty_print()
+
 
 # # Find all solutions
 # solver = SudokuMIPSolver(board, width, height)

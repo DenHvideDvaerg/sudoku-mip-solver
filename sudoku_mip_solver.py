@@ -189,3 +189,91 @@ class SudokuMIPSolver:
         self.current_solution = None
         
         return self.model
+    
+    @classmethod
+    def from_string(cls, sudoku_string, sub_grid_width = 3, sub_grid_height=None):
+        """
+        Create a SudokuMIPSolver instance from a string representation.
+        
+        Parameters:
+        - sudoku_string: A string where each character represents a cell value.
+                         Use '0', '.', or any non-digit character for empty cells.
+        - sub_grid_width: Width of the sub-grid (defaults to 3 for standard Sudoku)
+        - sub_grid_height: Height of the sub-grid (defaults to sub_grid_width)
+        
+        Returns:
+        - A new SudokuMIPSolver instance
+        
+        Example:
+            "700006200080001007046070300060090000050040020000010040009020570500100080008900003"
+            represents a 9x9 Sudoku with certain cells filled.
+        """
+        if sub_grid_height is None:
+            sub_grid_height = sub_grid_width
+            
+        size = sub_grid_width * sub_grid_height
+        
+        # Remove any whitespace or newlines
+        sudoku_string = ''.join(sudoku_string.split())
+        
+        # Check if the string has the correct length
+        if len(sudoku_string) != size * size:
+            raise ValueError(f"String length must be {size * size} for a {size}x{size} Sudoku")
+        
+        # Parse the string into a board
+        board = []
+        for i in range(0, len(sudoku_string), size):
+            row = []
+            for j in range(size):
+                char = sudoku_string[i + j]
+                # Convert to integer if it's a digit and not 0
+                if char.isdigit() and char != '0':
+                    row.append(int(char))
+                else:
+                    row.append(None)  # Empty cell
+            board.append(row)
+        
+        return cls(board, sub_grid_width, sub_grid_height)
+    
+    def pretty_print(self, board=None):
+        """
+        Pretty print the Sudoku board with grid lines showing sub-grids.
+        
+        Parameters:
+        - board: The board to print. If None, prints the current solution.
+        
+        Returns:
+        - None (prints to console)
+        """
+        if board is None:
+            if self.current_solution is None:
+                raise ValueError("No solution available to print")
+            board = self.current_solution
+        
+        # Determine characters needed for each cell based on puzzle size
+        cell_width = len(str(self.size)) + 1  # +1 for spacing
+        
+        # Horizontal separator for sub-grids
+        h_separator = "+" + "+".join(["-" * (cell_width * self.sub_grid_width) for _ in range(self.sub_grid_height)]) + "+"
+        
+        for r in range(self.size):
+            # Print horizontal separator at the beginning of each sub-grid row
+            if r % self.sub_grid_height == 0:
+                print(h_separator)
+            
+            row_str = ""
+            for c in range(self.size):
+                # Print vertical separator at the beginning of each sub-grid column
+                if c % self.sub_grid_width == 0:
+                    row_str += "|"
+                
+                # Get the value, ensure it's right-aligned within its cell width
+                value = board[r][c] if board[r][c] is not None else "."
+                row_str += f"{value}".rjust(cell_width)
+            
+            # End the row with a vertical separator
+            row_str += "|"
+            print(row_str)
+        
+        # Print horizontal separator at the end
+        print(h_separator)
