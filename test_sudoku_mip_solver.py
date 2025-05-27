@@ -270,20 +270,20 @@ class TestSudokuMIPSolverFromString:
         sudoku_string = "123"  # Too short for 4x4 board (needs 16)
         with pytest.raises(ValueError, match="String length must be 16 for a 4x4 Sudoku"):
             SudokuMIPSolver.from_string(sudoku_string, 2, 2)
-    
+
     def test_from_string_invalid_length_too_long(self):
         """Test that string too long for board size raises ValueError."""
         sudoku_string = "12345678901234567"  # Too long for 4x4 board (needs 16)
         with pytest.raises(ValueError, match="String length must be 16 for a 4x4 Sudoku"):
             SudokuMIPSolver.from_string(sudoku_string, 2, 2)
-    
+
     def test_from_string_with_invalid_digits(self):
         """Test string with digits larger than board size."""
         # For 4x4 board, valid digits are 1-4, but string contains '5'
         sudoku_string = "1234567890123456"
-        with pytest.raises(ValueError, match="Invalid value 5 at position \\(1,0\\). Must be None or integer from 1 to 4"):
+        with pytest.raises(ValueError, match="Value 5 is too large for 4x4 board"):
             SudokuMIPSolver.from_string(sudoku_string, 2, 2)
-    
+
     def test_from_string_empty_string(self):
         """Test behavior with empty string."""
         with pytest.raises(ValueError, match="String length must be 4 for a 2x2 Sudoku"):
@@ -308,20 +308,122 @@ class TestSudokuMIPSolverFromString:
             [1, 2, 3, 4],
             [3, 4, 1, 2],
             [2, 1, 4, 3],
-            [4, 3, 2, 1]
+            [4, 3, 2, 1]        
         ]
         assert solver.board == expected_board
 
     def test_from_string_large_digits_for_big_board(self):
-        """Test string parsing for larger boards with double-digit sizes."""
-        # For a 4x3 = 12 size board, valid digits are 1-9 and 10,11,12
-        # But since we parse character by character, this is limited to single digits
-        # This test shows the limitation - we can only handle sizes up to 9
-        sudoku_string = "123456789" * 16  # 144 chars for 12x12, but only uses digits 1-9
+        """Test string parsing for larger boards requires delimiters."""
+        # For a 4x3 = 12 size board, delimiter is required since size > 9
+        sudoku_string = "123456789" * 16  # 144 chars for 12x12, but no delimiters
         
-        # This should work since all digits 1-9 are valid for a 12x12 board
-        solver = SudokuMIPSolver.from_string(sudoku_string, 4, 3)
-        assert solver.size == 12
-        assert all(1 <= cell <= 9 for row in solver.board for cell in row if cell is not None)
+        # This should fail since 12x12 boards require delimiters
+        with pytest.raises(ValueError, match="For 12x12 boards, values must be separated by spaces or commas"):
+            SudokuMIPSolver.from_string(sudoku_string, 4, 3)
 
-    # TODO: update from_string to handle multi-digit input for boards bigger than 9x9
+    # Enhanced tests for delimiter-based parsing (multi-digit support)
+    
+    def test_from_string_16x16_space_delimited(self):
+        """Test creating a 16x16 Sudoku from space-delimited string."""
+        # Create a partial 16x16 puzzle with space-separated values
+        values = ["1", "2", "0", "0", "5", "6", "0", "0", "9", "10", "0", "0", "13", "14", "0", "0"] * 16
+        sudoku_string = " ".join(values)
+        
+        solver = SudokuMIPSolver.from_string(sudoku_string, 4, 4)
+        
+        assert solver.size == 16
+        assert solver.sub_grid_width == 4
+        assert solver.sub_grid_height == 4
+        
+        # Check specific values
+        assert solver.board[0][0] == 1
+        assert solver.board[0][1] == 2
+        assert solver.board[0][2] is None  # '0' becomes None
+        assert solver.board[0][8] == 9
+        assert solver.board[0][9] == 10
+    
+    def test_from_string_16x16_comma_delimited(self):
+        """Test creating a 16x16 Sudoku from comma-delimited string."""
+        # Create pattern with comma separation
+        values = ["0"] * 256  # All empty cells
+        values[0] = "16"  # First cell
+        values[17] = "15"  # Second row, second cell
+        values[255] = "1"  # Last cell
+        
+        sudoku_string = ",".join(values)
+        
+        solver = SudokuMIPSolver.from_string(sudoku_string, 4, 4)
+        
+        assert solver.size == 16
+        assert solver.board[0][0] == 16
+        assert solver.board[1][1] == 15
+        assert solver.board[15][15] == 1
+        # Most cells should be None
+        none_count = sum(1 for row in solver.board for cell in row if cell is None)
+        assert none_count == 253  # 256 - 3 filled cells
+    
+    def test_from_string_auto_detect_space_delimiter(self):
+        """Test auto-detection of space delimiter for large boards."""
+        # 10x10 board requires delimiter since size > 9
+        values = ["1", "10", "0", "5"] + ["0"] * 96  # 100 values total
+        sudoku_string = " ".join(values)
+        
+        solver = SudokuMIPSolver.from_string(sudoku_string, 5, 2)  # 5x2 sub-grids
+        
+        assert solver.size == 10
+        assert solver.board[0][0] == 1
+        assert solver.board[0][1] == 10
+        assert solver.board[0][2] is None
+        assert solver.board[0][3] == 5
+    
+    def test_from_string_auto_detect_comma_delimiter(self):
+        """Test auto-detection of comma delimiter for large boards."""
+        values = ["12", "0", "11", "0"] + ["0"] * 140  # 144 values for 12x12
+        sudoku_string = ",".join(values)
+        
+        solver = SudokuMIPSolver.from_string(sudoku_string, 3, 4)  # 3x4 sub-grids
+        
+        assert solver.size == 12
+        assert solver.board[0][0] == 12
+        assert solver.board[0][1] is None
+        assert solver.board[0][2] == 11
+        assert solver.board[0][3] is None
+    
+    def test_from_string_explicit_delimiter_parameter(self):
+        """Test explicit delimiter parameter override."""
+        # Use semicolon as delimiter
+        values = ["1", "2", "0", "4"] + ["0"] * 12  # 16 values for 4x4
+        sudoku_string = ";".join(values)
+        
+        solver = SudokuMIPSolver.from_string(sudoku_string, 2, 2, delimiter=";")
+        
+        assert solver.size == 4
+        assert solver.board[0] == [1, 2, None, 4]
+    
+    def test_from_string_delimiter_detection_error(self):
+        """Test error when no delimiter can be detected for large boards."""
+        # 10x10 board without spaces or commas
+        sudoku_string = "1234567890" * 10  # 100 chars but no delimiters
+        
+        with pytest.raises(ValueError, match="For 10x10 boards, values must be separated by spaces or commas"):
+            SudokuMIPSolver.from_string(sudoku_string, 5, 2)
+    
+    def test_from_string_wrong_number_of_delimited_values(self):
+        """Test error for wrong number of delimited values."""
+        # 10x10 board needs 100 values, but provide only 99 (forces delimiter mode)
+        values = ["1", "2", "0"] * 33  # 99 values, need 100
+        sudoku_string = " ".join(values)
+        
+        with pytest.raises(ValueError, match="Must have exactly 100 values for a 10x10 Sudoku"):
+            SudokuMIPSolver.from_string(sudoku_string, 5, 2)
+    
+    def test_from_string_whitespace_handling_delimited(self):
+        """Test proper whitespace handling in delimited strings."""
+        # String with extra whitespace around values
+        values = ["1", "2", "0", "4"] + ["0"] * 12  # Exactly 16 values
+        sudoku_string = "  " + " ,  ".join(values) + "  "  # Extra spaces around commas
+        
+        solver = SudokuMIPSolver.from_string(sudoku_string, 2, 2, delimiter=",")
+        
+        assert solver.size == 4
+        assert solver.board[0] == [1, 2, None, 4]
