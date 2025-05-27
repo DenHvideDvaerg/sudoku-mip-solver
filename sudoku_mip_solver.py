@@ -29,9 +29,6 @@ class SudokuMIPSolver:
                     raise ValueError(f"Invalid value {val} at position ({r},{c}). Must be None or integer from 1 to {self.size}")
         
         self.board = board
-        self.sub_grid_width = sub_grid_width
-        self.sub_grid_height = sub_grid_height if sub_grid_height is not None else sub_grid_width
-        self.size = self.sub_grid_width * self.sub_grid_height      
         self.model = None
         self.current_solution = None
         self.cut_constraints = []
