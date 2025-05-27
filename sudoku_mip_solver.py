@@ -39,12 +39,13 @@ class SudokuMIPSolver:
         self.model = LpProblem("SudokuSolver",LpMinimize)
         
         # Create variables - x[row,column,value] = 1 if cell (row,column) has value
-        self.variables = LpVariable.dicts("x", 
-                                              ((row, column, value) for row in range(self.size) 
-                                                                    for column in range(self.size) 
-                                                                    for value in range(1, self.size+1)),
-                                              cat="Binary"
-        )
+        self.variables = {}
+        for r in range(self.size):
+            for c in range(self.size):
+                for v in range(1, self.size+1):
+                    # Variable name uses 1-based indexing for readability, but are stored with 0-based indexing
+                    var_name = f"x_({r+1},{c+1},{v})"
+                    self.variables[r, c, v] = LpVariable(var_name, cat="Binary")
         
         # One value per cell
         for r in range(self.size):
