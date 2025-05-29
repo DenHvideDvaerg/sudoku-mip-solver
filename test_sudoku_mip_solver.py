@@ -1,4 +1,5 @@
 import pytest
+from pulp import LpInteger
 from sudoku_mip_solver import SudokuMIPSolver
 
 
@@ -427,3 +428,170 @@ class TestSudokuMIPSolverFromString:
         
         assert solver.size == 4
         assert solver.board[0] == [1, 2, None, 4]
+
+class TestSudokuMIPSolverBuildModel:
+    """Test cases for SudokuMIPSolver.build_model method."""
+    
+    def test_model_creation(self):
+        """Test that the model is created with correct structure."""
+        board = [[None for _ in range(4)] for _ in range(4)]
+        solver = SudokuMIPSolver(board, 2, 2)
+        model = solver.build_model()
+        
+        # Verify model was created
+        assert model is not None
+        assert solver.model is not None
+        assert model is solver.model
+        
+        # Verify objective is dummy (value 0)
+        assert model.objective.value() == 0
+    
+    def test_variables_creation_4x4(self):
+        """Test that variables are created correctly for a 4x4 board."""
+        board = [[None for _ in range(4)] for _ in range(4)]
+        solver = SudokuMIPSolver(board, 2, 2)
+        solver.build_model()
+        
+        # Should have r*c*v variables = 4*4*4 = 64 variables
+        assert len(solver.variables) == 64
+        
+        # Check specific variable exists with correct attributes
+        var = solver.variables[0, 0, 1]  # Top-left cell, value 1
+        assert var.name == "x_(1,1,1)"
+        assert var.lowBound == 0
+        assert var.upBound == 1
+        assert var.cat == LpInteger # Binary variables are simply integer variables bounded between 0 and 1
+    
+    def test_constraint_counts_4x4(self):
+        """Test that the right number of constraints are created for 4x4 board."""
+        board = [[None for _ in range(4)] for _ in range(4)]
+        solver = SudokuMIPSolver(board, 2, 2)
+        model = solver.build_model()
+        
+        # Calculate expected constraints:
+        # - One value per cell: 4×4 = 16 constraints
+        # - One of each value per row: 4×4 = 16 constraints
+        # - One of each value per column: 4×4 = 16 constraints
+        # - One of each value per box: 2×2×4 = 16 constraints
+        # - No initial values in this example
+        # Total: 64 constraints
+        
+        assert len(model.constraints) == 64
+        
+        # Verify constraint names by type
+        cell_constraints = [c for c in model.constraints if c.startswith("cell_")]
+        row_constraints = [c for c in model.constraints if c.startswith("row_")]
+        col_constraints = [c for c in model.constraints if c.startswith("col_")]
+        box_constraints = [c for c in model.constraints if c.startswith("box_")]
+        fixed_constraints = [c for c in model.constraints if c.startswith("fixed_value")]
+        
+        assert len(cell_constraints) == 16
+        assert len(row_constraints) == 16
+        assert len(col_constraints) == 16
+        assert len(box_constraints) == 16
+        assert len(fixed_constraints) == 0  # No initial values
+    
+    def test_constraint_counts_9x9(self):
+        """Test that the right number of constraints are created for 9x9 board."""
+        board = [[None for _ in range(9)] for _ in range(9)]
+        # Fill a few cells with values
+        board[0][0] = 5
+        board[1][2] = 3
+        board[8][8] = 1
+        
+        solver = SudokuMIPSolver(board, 3, 3)
+        model = solver.build_model()
+        
+        # Calculate expected constraints:
+        # - One value per cell: 9×9 = 81 constraints
+        # - One of each value per row: 9×9 = 81 constraints
+        # - One of each value per column: 9×9 = 81 constraints
+        # - One of each value per box: 3×3×9 = 81 constraints
+        # - Fixed values: 3 constraints
+        # Total: 327 constraints
+        
+        assert len(model.constraints) == 327
+        
+        # Verify constraint names by type
+        cell_constraints = [c for c in model.constraints if c.startswith("cell_")]
+        row_constraints = [c for c in model.constraints if c.startswith("row_")]
+        col_constraints = [c for c in model.constraints if c.startswith("col_")]
+        box_constraints = [c for c in model.constraints if c.startswith("box_")]
+        fixed_constraints = [c for c in model.constraints if c.startswith("fixed_value")]
+        
+        assert len(cell_constraints) == 81
+        assert len(row_constraints) == 81
+        assert len(col_constraints) == 81
+        assert len(box_constraints) == 81
+        assert len(fixed_constraints) == 3
+    
+    def test_fixed_values_constraints(self):
+        """Test that initial values are properly fixed in the model."""
+        # Create a board with some initial values
+        board = [
+            [1, None, 3, None],
+            [None, None, None, None],
+            [None, None, None, None],
+            [None, 4, None, 2]
+        ]
+        solver = SudokuMIPSolver(board, 2, 2)
+        solver.build_model()
+        
+        # Check that the right variables are fixed to 1
+        # These constraints fix initial values
+        # Note: the constant in the constraint is -1 for fixed values (on the left side of the equation)
+        constraints = solver.model.constraints
+        
+        # Check value 1 at position (0,0)
+        assert "fixed_value_at_1_1" in constraints
+        constraint = constraints["fixed_value_at_1_1"]
+        # Should be "x_(1,1,1) = 1"
+        assert constraint.constant == -1
+        
+        # Check value 3 at position (0,2)
+        assert "fixed_value_at_1_3" in constraints
+        constraint = constraints["fixed_value_at_1_3"]
+        # Should be "x_(1,3,3) = 1"
+        assert constraint.constant == -1
+        
+        # Check value 4 at position (3,1)
+        assert "fixed_value_at_4_2" in constraints
+        constraint = constraints["fixed_value_at_4_2"]
+        # Should be "x_(4,2,4) = 1" 
+        assert constraint.constant == -1
+        
+        # Check value 2 at position (3,3)
+        assert "fixed_value_at_4_4" in constraints
+        constraint = constraints["fixed_value_at_4_4"]
+        # Should be "x_(4,4,2) = 1"
+        assert constraint.constant == -1
+    
+    def test_build_model_complex_shape(self):
+        """Test building model with non-square sub-grids (6x6 with 2x3 sub-grids)."""
+        board = [[None for _ in range(6)] for _ in range(6)]
+        solver = SudokuMIPSolver(board, 2, 3)
+        model = solver.build_model()
+        
+        # Calculate expected constraints:
+        # - One value per cell: 6×6 = 36 constraints
+        # - One of each value per row: 6×6 = 36 constraints
+        # - One of each value per column: 6×6 = 36 constraints
+        # - One of each value per box: 3×2×6 = 36 constraints
+        # Total: 144 constraints
+        
+        assert len(model.constraints) == 144
+        
+        # Verify box constraint structure by checking a few boxes
+        # For 2x3 sub-grids, we should have 2 rows of boxes and 3 columns of boxes
+        box_constraints = {c: model.constraints[c] for c in model.constraints if c.startswith("box_")}
+        
+        # Check that we have constraints for all box coordinates
+        # For 2x3 sub-grids in a 6x6 board, we have:
+        # - Boxes in rows: 6÷3 = 2 rows (indexed 1-2 in constraint names)
+        # - Boxes in columns: 6÷2 = 3 columns (indexed 1-3 in constraint names)
+        for box_r in range(1, 3):  # 2 rows of boxes (1-based indexing in names)
+            for box_c in range(1, 4):  # 3 columns of boxes
+                for v in range(1, 7):  # 6 values
+                    constraint_name = f"box_{box_r}_{box_c}_has_value_{v}"
+                    assert constraint_name in box_constraints, f"Missing constraint: {constraint_name}"
+    
