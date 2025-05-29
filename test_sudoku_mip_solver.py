@@ -594,4 +594,225 @@ class TestSudokuMIPSolverBuildModel:
                 for v in range(1, 7):  # 6 values
                     constraint_name = f"box_{box_r}_{box_c}_has_value_{v}"
                     assert constraint_name in box_constraints, f"Missing constraint: {constraint_name}"
+
+class TestSudokuMIPSolverSolve:
+    """Test cases for SudokuMIPSolver solving methods."""
     
+    @classmethod
+    def validate_4x4_solution(cls, solution):
+        expected_values = set(range(1, 5))  
+         
+        # Check rows
+        for r in range(4):
+            row_values = set(solution[r][c] for c in range(4))
+            assert row_values == expected_values, f"Row {r+1} has invalid values: {row_values}"
+
+        # Check columns
+        for c in range(4):
+            col_values = set(solution[r][c] for r in range(4))
+            assert col_values == expected_values, f"Column {c+1} has invalid values: {col_values}"
+
+        # Check sub-grids
+        for box_r in range(2):  # 2 rows of boxes
+            for box_c in range(2):  # 2 columns of boxes
+                 box_values = set(solution[box_r*2 + r][box_c*2 + c] 
+                             for r in range(2) for c in range(2))
+            assert box_values == expected_values, f"Box ({box_r+1},{box_c+1}) has invalid values: {box_values}"
+
+    def test_solve_basic_4x4(self):
+        """Test solving a very simple 4x4 sudoku puzzle."""
+        # Create a 4x4 board with some initial values
+        board = [
+            [1, None, None, 4],
+            [None, 4, 1, None],
+            [4, 1, None, None],
+            [None, None, 4, 1]
+        ]
+        
+        solver = SudokuMIPSolver(board, 2, 2)
+        result = solver.solve()
+        
+        assert result is True
+        assert solver.current_solution is not None
+        
+        solution = solver.current_solution
+        # Verify initial values are preserved
+        assert solution[0][0] == 1
+        assert solution[0][3] == 4
+        assert solution[1][1] == 4
+        assert solution[1][2] == 1
+        assert solution[2][0] == 4
+        assert solution[2][1] == 1
+        assert solution[3][2] == 4
+        assert solution[3][3] == 1
+        
+        TestSudokuMIPSolverSolve.validate_4x4_solution(solution)
+    
+    def test_solve_unsolvable_board(self):
+        """Test solving an unsolvable sudoku puzzle."""
+        # Create a 4x4 board with conflicting values
+        board = [
+            [1, 1, None, None],  # Conflicting 1's in first row
+            [None, None, None, None],
+            [None, None, None, None],
+            [None, None, None, None]
+        ]
+        
+        solver = SudokuMIPSolver(board, 2, 2)
+        result = solver.solve()
+        
+        # Should not be solvable
+        assert result is False
+        assert solver.current_solution is None
+    
+    def test_solve_complete_board(self):
+        """Test solving an already complete valid board."""
+        # Already solved 4x4 sudoku
+        board = [
+            [1, 2, 3, 4],
+            [3, 4, 1, 2],
+            [2, 1, 4, 3],
+            [4, 3, 2, 1]
+        ]
+        solver = SudokuMIPSolver(board, 2, 2)
+        result = solver.solve()
+        assert result is True
+        assert solver.current_solution is not None
+        assert solver.current_solution == board
+
+        TestSudokuMIPSolverSolve.validate_4x4_solution(solver.current_solution)
+    
+    def test_solve_empty_board(self):
+        """Test solving a completely empty board (many solutions)."""
+        # Empty 4x4 board
+        board = [[None for _ in range(4)] for _ in range(4)]
+        
+        solver = SudokuMIPSolver(board, 2, 2)
+        result = solver.solve()
+        assert result is True
+        assert solver.current_solution is not None
+        
+        TestSudokuMIPSolverSolve.validate_4x4_solution(solver.current_solution)
+    
+    def test_find_all_solutions_unique(self):
+        """Test finding all solutions for a board with a unique solution."""
+        # This board has enough clues to have a unique solution
+        board = [
+            [1, None, 3, None],
+            [3, None, None, 2],
+            [None, 1, None, 3],
+            [None, None, 2, None]
+        ]
+        
+        solver = SudokuMIPSolver(board, 2, 2)
+        solutions = solver.find_all_solutions()
+        
+        assert len(solutions) == 1
+        
+        TestSudokuMIPSolverSolve.validate_4x4_solution(solutions[0])
+    
+    def test_find_all_solutions_multiple(self):
+        """Test finding all solutions for a board with multiple solutions."""
+        # This board has fewer clues and multiple solutions
+        board = [
+            [1, None, None, None],
+            [None, None, None, None],
+            [None, None, None, None],
+            [None, None, None, 2]
+        ]
+        
+        solver = SudokuMIPSolver(board, 2, 2)
+        # Limit to 5 to avoid long runtime (has more than 5 solutions)
+        sol_limit = 5
+        solutions = solver.find_all_solutions(max_solutions=sol_limit)  
+        
+        # Should have multiple solutions
+        assert len(solutions) == sol_limit
+        
+        # Verify all solutions follow sudoku rules and preserve initial values
+        for solution in solutions:
+            assert solution[0][0] == 1
+            assert solution[3][3] == 2
+            
+            TestSudokuMIPSolverSolve.validate_4x4_solution(solution)
+
+            
+        # Verify all solutions are different
+        solution_strs = [''.join(''.join(str(cell) for cell in row) for row in solution) 
+                        for solution in solutions]
+        assert len(set(solution_strs)) == sol_limit
+
+    def test_cut_current_solution(self):
+        """Test that cut_current_solution excludes the current solution."""
+        # Simple 4x4 board with a unique solution
+        board = [
+            [1, None, 3, None],
+            [None, None, None, 2],
+            [None, 1, None, None],
+            [None, None, 2, None]
+        ]
+        
+        solver = SudokuMIPSolver(board, 2, 2)
+        
+        # Solve first time
+        solver.solve()
+        first_solution = [row[:] for row in solver.current_solution]  # Deep copy
+        
+        # Add constraint to exclude this solution
+        solver.cut_current_solution()
+        
+        # Solve again
+        solver.solve()
+        
+        second_solution = solver.current_solution
+        assert second_solution != first_solution
+            
+        # Verify constraint was added
+        assert len(solver.cut_constraints) == 1
+        constraint_name = solver.cut_constraints[0][0]
+        assert constraint_name == "cut_1"
+        assert constraint_name in solver.model.constraints
+    
+    def test_cut_current_solution_no_solution(self):
+        """Test that cut_current_solution raises an error when no solution exists."""
+        board = [[None for _ in range(4)] for _ in range(4)]
+        
+        solver = SudokuMIPSolver(board, 2, 2)
+        # Don't solve first, so there's no current_solution
+        
+        with pytest.raises(ValueError, match="No current solution to cut."):
+            solver.cut_current_solution()
+    
+    def test_solve_standard_9x9(self):
+        """Test solving a standard 9x9 sudoku puzzle."""
+        # Using a 9x9 from test_from_string_standard_9x9
+        sudoku_string = "700006200080001007046070300060090000050040020000010040009020570500100080008900003"
+        solver = SudokuMIPSolver.from_string(sudoku_string)
+        
+        result = solver.solve()
+        
+        assert result is True
+        assert solver.current_solution is not None
+        
+        # Verify initial values are preserved
+        assert solver.current_solution[0][0] == 7
+        assert solver.current_solution[0][5] == 6
+        assert solver.current_solution[8][8] == 3
+        
+        # Verify solution follows sudoku rules
+        for r in range(9):
+            row_values = [solver.current_solution[r][c] for c in range(9)]
+            assert sorted(row_values) == list(range(1, 10))
+            
+        for c in range(9):
+            col_values = [solver.current_solution[r][c] for r in range(9)]
+            assert sorted(col_values) == list(range(1, 10))
+            
+        # Check box constraints
+        for box_r in range(3):
+            for box_c in range(3):
+                box_values = []
+                for r in range(3):
+                    for c in range(3):
+                        box_values.append(solver.current_solution[box_r*3 + r][box_c*3 + c])
+                assert sorted(box_values) == list(range(1, 10))
