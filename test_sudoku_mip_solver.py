@@ -783,6 +783,46 @@ class TestSudokuMIPSolverSolve:
         with pytest.raises(ValueError, match="No current solution to cut."):
             solver.cut_current_solution()
     
+    def test_reset_model(self):
+        """Test that reset_model removes solution cuts and restores original constraints."""
+        # Board with multiple solutions
+        board = [
+            [1, None, None, None],
+            [None, None, None, None],
+            [None, None, None, None],
+            [None, None, None, 2]
+        ]
+        
+        solver = SudokuMIPSolver(board, 2, 2)
+        
+        # Find first solution
+        solver.solve()
+        original_solution = [row[:] for row in solver.current_solution]
+        
+        # Add cuts to exclude first solution
+        solver.cut_current_solution()
+        
+        # Check constraint was added
+        assert len(solver.cut_constraints) == 1
+        assert any(name.startswith("cut_") for name in solver.model.constraints)
+        
+        # Find second solution (should be different)
+        solver.solve()
+        second_solution = [row[:] for row in solver.current_solution]
+        assert original_solution != second_solution
+        
+        # Reset model
+        solver.reset_model()
+        
+        # Verify reset worked
+        assert solver.cut_constraints == []
+        assert solver.current_solution is None
+        assert not any(name.startswith("cut_") for name in solver.model.constraints)
+        
+        # Solve again - should get original solution back since cuts were removed
+        solver.solve()
+        assert solver.current_solution == original_solution
+
     def test_solve_standard_9x9(self):
         """Test solving a standard 9x9 sudoku puzzle."""
         # Using a 9x9 from test_from_string_standard_9x9
