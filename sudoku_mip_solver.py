@@ -189,46 +189,80 @@ class SudokuMIPSolver:
         return self.model
     
     @classmethod
-    def from_string(cls, sudoku_string, sub_grid_width = 3, sub_grid_height=None):
+    def from_string(cls, sudoku_string, sub_grid_width=3, sub_grid_height=None, delimiter=None):
         """
         Create a SudokuMIPSolver instance from a string representation.
         
         Parameters:
-        - sudoku_string: A string where each character represents a cell value.
-                         Use '0', '.', or any non-digit character for empty cells.
-        - sub_grid_width: Width of the sub-grid (defaults to 3 for standard Sudoku)
+        - sudoku_string: A string where each value represents a cell.
+                         For boards ≤9x9: single characters (no delimiter needed)
+                         For larger boards: values separated by delimiter
+        - sub_grid_width: Width of the sub-grid (defaults to 3)
         - sub_grid_height: Height of the sub-grid (defaults to sub_grid_width)
+        - delimiter: Character separating values (auto-detected if None)
         
         Returns:
         - A new SudokuMIPSolver instance
         
-        Example:
+        Examples:
+            # 9x9 board (single characters)
             "700006200080001007046070300060090000050040020000010040009020570500100080008900003"
-            represents a 9x9 Sudoku with certain cells filled.
+            
+            # 16x16 board (space-separated)
+            "1 2 0 0 5 6 0 0 9 10 0 0 13 14 0 0 3 4 0 0 7 8 0 0 11 12 0 0 15 16 0 0"
+            
+            # 16x16 board (comma-separated)
+            "1,2,0,0,5,6,0,0,9,10,0,0,13,14,0,0,3,4,0,0,7,8,0,0,11,12,0,0,15,16,0,0"
         """
         if sub_grid_height is None:
             sub_grid_height = sub_grid_width
             
         size = sub_grid_width * sub_grid_height
         
-        # Remove any whitespace or newlines
-        sudoku_string = ''.join(sudoku_string.split())
+        # Auto-detect delimiter if not provided
+        if delimiter is None:
+            if size <= 9:
+                # For small boards, assume single character per cell
+                delimiter = ""
+            else:
+                # For larger boards, detect common delimiters
+                if "," in sudoku_string:
+                    delimiter = ","
+                elif " " in sudoku_string:
+                    delimiter = " "
+                else:
+                    raise ValueError(f"For {size}x{size} boards, values must be separated by spaces or commas")
         
-        # Check if the string has the correct length
-        if len(sudoku_string) != size * size:
-            raise ValueError(f"String length must be {size * size} for a {size}x{size} Sudoku")
+        # Parse based on delimiter
+        if delimiter == "":
+            # Single character mode (original behavior)
+            sudoku_string = ''.join(sudoku_string.split())
+            if len(sudoku_string) != size * size:
+                raise ValueError(f"String length must be {size * size} for a {size}x{size} Sudoku")
+            
+            values = list(sudoku_string)
+        else:
+            # Delimited mode
+            sudoku_string = sudoku_string.strip()
+            values = sudoku_string.split(delimiter)
+            if len(values) != size * size:
+                raise ValueError(f"Must have exactly {size * size} values for a {size}x{size} Sudoku")
         
-        # Parse the string into a board
+        # Parse values into board
         board = []
-        for i in range(0, len(sudoku_string), size):
+        for i in range(0, len(values), size):
             row = []
             for j in range(size):
-                char = sudoku_string[i + j]
-                # Convert to integer if it's a digit and not 0
-                if char.isdigit() and char != '0':
-                    row.append(int(char))
+                value_str = values[i + j].strip()
+                
+                # Convert to integer if valid
+                if value_str.isdigit() and value_str != '0':
+                    value = int(value_str)
+                    if value > size:
+                        raise ValueError(f"Value {value} is too large for {size}x{size} board")
+                    row.append(value)
                 else:
-                    row.append(None)  # Empty cell
+                    row.append(None)  # Empty cell (0, '.', or any non-digit)
             board.append(row)
         
         return cls(board, sub_grid_width, sub_grid_height)
