@@ -86,14 +86,13 @@ class SudokuMIPSolver:
         
         return self.model
     
-
-    def solve(self):
+    def solve(self, show_output=False):
         """Solve the Sudoku puzzle and return bool indicating if a solution was found."""
         if not self.model:
             self.build_model()
             
         # Solve the model
-        self.model.solve(pulp.PULP_CBC_CMD())
+        self.model.solve(pulp.PULP_CBC_CMD(msg=show_output))
         
         # Extract solution
         if self.model.status == pulp.LpStatusOptimal:
