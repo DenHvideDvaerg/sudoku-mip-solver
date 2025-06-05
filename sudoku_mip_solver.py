@@ -1,4 +1,4 @@
-from pulp import *
+import pulp
 
 class SudokuMIPSolver: 
     def __init__(self, board: list[list[int]], sub_grid_width: int, sub_grid_height: int = None):
@@ -36,7 +36,7 @@ class SudokuMIPSolver:
     def build_model(self):
         """Build the MIP model with all Sudoku constraints."""
         # Create the model
-        self.model = LpProblem("SudokuSolver",LpMinimize)
+        self.model = pulp.LpProblem("SudokuSolver",pulp.LpMinimize)
         
         # Create variables - x[row,column,value] = 1 if cell (row,column) has value
         self.variables = {}
@@ -45,32 +45,32 @@ class SudokuMIPSolver:
                 for v in range(1, self.size+1):
                     # Variable name uses 1-based indexing for readability, but are stored with 0-based indexing
                     var_name = f"x_({r+1},{c+1},{v})"
-                    self.variables[r, c, v] = LpVariable(var_name, cat="Binary")
+                    self.variables[r, c, v] = pulp.LpVariable(var_name, cat="Binary")
         
         # One value per cell
         for r in range(self.size):
             for c in range(self.size):
                 constraint_name = f"cell_{r+1}_{c+1}_one_value"
-                self.model += lpSum(self.variables[r, c, v] for v in range(1, self.size+1)) == 1, constraint_name
+                self.model += pulp.lpSum(self.variables[r, c, v] for v in range(1, self.size+1)) == 1, constraint_name
 
         # One of each value per row
         for r in range(self.size):
             for v in range(1, self.size+1):
                 constraint_name = f"row_{r+1}_has_value_{v}"
-                self.model += lpSum(self.variables[r, c, v] for c in range(self.size)) == 1, constraint_name
+                self.model += pulp.lpSum(self.variables[r, c, v] for c in range(self.size)) == 1, constraint_name
         
         # One of each value per column
         for c in range(self.size):
             for v in range(1, self.size+1):
                 constraint_name = f"col_{c+1}_has_value_{v}"
-                self.model += lpSum(self.variables[r, c, v] for r in range(self.size)) == 1, constraint_name
+                self.model += pulp.lpSum(self.variables[r, c, v] for r in range(self.size)) == 1, constraint_name
         
         # One of each value per box (sub-grid)
         for box_r in range(self.size // self.sub_grid_height):
             for box_c in range(self.size // self.sub_grid_width):
                 for v in range(1, self.size+1):
                     constraint_name = f"box_{box_r+1}_{box_c+1}_has_value_{v}"
-                    self.model += lpSum(self.variables[box_r*self.sub_grid_height + r, box_c*self.sub_grid_width + c, v] 
+                    self.model += pulp.lpSum(self.variables[box_r*self.sub_grid_height + r, box_c*self.sub_grid_width + c, v] 
                                     for r in range(self.sub_grid_height) 
                                     for c in range(self.sub_grid_width)) == 1, constraint_name
             
@@ -93,10 +93,10 @@ class SudokuMIPSolver:
             self.build_model()
             
         # Solve the model
-        self.model.solve(pulp.PULP_CBC_CMD(msg=False))
+        self.model.solve(pulp.PULP_CBC_CMD())
         
         # Extract solution
-        if self.model.status == LpStatusOptimal:
+        if self.model.status == pulp.LpStatusOptimal:
             self.current_solution = self.extract_solution()
             return True
         else:
@@ -130,7 +130,7 @@ class SudokuMIPSolver:
         for r in range(self.size):
             for c in range(self.size):
                 for v in range(1, self.size+1):
-                    if value(self.variables[r, c, v]) == 1:
+                    if pulp.value(self.variables[r, c, v]) == 1:
                         solution[r][c] = v
         return solution
 
@@ -141,7 +141,7 @@ class SudokuMIPSolver:
         
         # Create the constraint
         constraint_name = f"cut_{len(self.cut_constraints) + 1}"
-        cut_constraint = lpSum(self.variables[r, c, self.current_solution[r][c]] 
+        cut_constraint = pulp.lpSum(self.variables[r, c, self.current_solution[r][c]] 
                         for r in range(self.size) 
                         for c in range(self.size)) <= self.size * self.size - 1
         
@@ -160,7 +160,7 @@ class SudokuMIPSolver:
     def print_model(self):
         """Print the model in a readable format."""
         print(f"Objective: {self.model.objective.value()}")
-        print(f"Status: {LpStatus[self.model.status]}")
+        print(f"Status: {pulp.LpStatus[self.model.status]}")
         print("Model:")
         for constraint in self.model.constraints.values():
             print(f"{constraint.name}: {constraint}")
