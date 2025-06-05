@@ -59,6 +59,7 @@ def parse_arguments():
     )
     
     # Solver options
+    # TODO: Change to one option that is max_solutions (defaults to 1, -1 for all)?
     solver_group = parser.add_argument_group("Solver Options")
     solver_group.add_argument(
         "-a", "--all", 
@@ -84,12 +85,7 @@ def parse_arguments():
         action="store_true",
         help="Show detailed solver information"
     )
-    output_group.add_argument(
-        "-t", "--timing", 
-        action="store_true",
-        help="Show solver timing information"
-    )
-    
+
     return parser.parse_args()
 
 
@@ -107,8 +103,7 @@ def main():
     """Main entry point for the Sudoku solver."""
     args = parse_arguments()
     
-    # Set up timing if requested
-    start_time = time.time() if args.timing else None
+    start_time = time.time()
     
     # Determine puzzle source and create the board
     if args.random:
@@ -176,15 +171,12 @@ def main():
         if args.verbose:
             print(f"Finding {'all' if args.max_solutions is None else args.max_solutions} solution(s)...")
         
-        solve_start = time.time() if args.timing else None
+        solve_start = time.time()
         all_solutions = solver.find_all_solutions(max_solutions=args.max_solutions)
-        solve_time = time.time() - solve_start if args.timing else None
+        solve_time = time.time() - solve_start
         
         if all_solutions:
-            if args.timing:
-                print(f"Found {len(all_solutions)} solution(s) in {solve_time:.4f} seconds")
-            else:
-                print(f"Found {len(all_solutions)} solution(s)")
+            print(f"Found {len(all_solutions)} solution(s) in {solve_time:.4f} seconds")
                 
             if len(all_solutions) == 1:
                 print("The solution is unique!")
@@ -204,15 +196,13 @@ def main():
         if args.verbose:
             print("Finding a single solution...")
             
-        solve_start = time.time() if args.timing else None
-        has_solution = solver.solve(True)
-        solve_time = time.time() - solve_start if args.timing else None
+        solve_start = time.time()
+        has_solution = solver.solve()
+        solve_time = time.time() - solve_start
         
         if has_solution:
-            if args.timing:
+            if args.verbose:
                 print(f"Solution found in {solve_time:.4f} seconds:")
-            else:
-                print("Solution found:")
                 
             if args.pretty:
                 solver.pretty_print(solver.current_solution)
@@ -226,7 +216,7 @@ def main():
     #     print("\nModel details:")
     #     solver.print_model()
     
-    if args.timing and start_time:
+    if args.verbose:
         total_time = time.time() - start_time
         print(f"\nTotal execution time: {total_time:.4f} seconds")
 
