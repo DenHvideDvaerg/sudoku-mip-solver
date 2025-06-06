@@ -188,6 +188,157 @@ class SudokuMIPSolver:
         return self.model
     
     @classmethod
+    def generate_random_puzzle(cls, sub_grid_width=3, sub_grid_height=None, target_difficulty=0.5, 
+                              unique_solution=True, max_attempts=100, random_seed=None):
+        """
+        Generate a random Sudoku puzzle with a specified difficulty level.
+        
+        Parameters:
+        - sub_grid_width: Width of the sub-grid (defaults to 3 for standard 9x9 Sudoku)
+        - sub_grid_height: Height of the sub-grid (defaults to sub_grid_width)
+        - target_difficulty: Float between 0.0 and 1.0 indicating desired difficulty
+                            (0.0 = easiest/all filled, 1.0 = hardest/minimal clues)
+                            This is a target and may not be achieved exactly if unique_solution=True
+        - unique_solution: Whether the puzzle must have exactly one solution
+        - max_attempts: Maximum number of attempts to achieve target difficulty with unique solution
+        - random_seed: Optional seed for random number generator
+        
+        Returns:
+        - A new SudokuMIPSolver instance with the generated puzzle
+        - The actual difficulty achieved (may differ from target if unique_solution=True)
+        """
+        import random
+        # TODO: Pass random seed to backend solver as well
+
+        # Set random seed if provided
+        if random_seed is not None:
+            random.seed(random_seed)
+            
+        if sub_grid_height is None:
+            sub_grid_height = sub_grid_width
+            
+        size = sub_grid_width * sub_grid_height
+        
+        # Validate difficulty parameter
+        if not 0.0 <= target_difficulty <= 1.0:
+            raise ValueError("Difficulty must be between 0.0 and 1.0")
+            
+        # Create an empty board
+        empty_board = [[None for _ in range(size)] for _ in range(size)]
+        
+        # Add random values along the diagonals of sub-grids
+        # This ensures no conflicts and provides a valid starting point
+        for i in range(0, size, sub_grid_height):
+            # Get valid values for this sub-grid (1 to size)
+            values = list(range(1, size + 1))
+            random.shuffle(values)
+            
+            # Fill the diagonal sub-grid
+            for r in range(sub_grid_height):
+                for c in range(sub_grid_width):
+                    row_idx = i + r
+                    col_idx = i + c
+                    if row_idx < size and col_idx < size:
+                        empty_board[row_idx][col_idx] = values.pop(0)
+        
+        # Create a solver with the initial board
+        solver = cls(empty_board, sub_grid_width, sub_grid_height)
+        
+        # Solve to get a complete valid solution
+        if not solver.solve():
+            # This should never happen given our initialization
+            raise RuntimeError("Failed to generate initial solution")
+        
+        # Get the complete solution
+        complete_solution = [row[:] for row in solver.current_solution]
+        
+        # Calculate number of cells to keep based on difficulty
+        total_cells = size * size
+        min_clues = 17 if size == 9 else max(1, size)  # Theoretical minimum for 9x9 is 17 (https://arxiv.org/abs/1201.0749)
+        max_clues = total_cells - 1  # We need at least one empty cell
+        
+        # Linear interpolation between min and max clues based on difficulty
+        target_clues = int(max_clues - target_difficulty * (max_clues - min_clues))
+        
+        # Create a copy of the complete solution to remove values from
+        working_board = [row[:] for row in complete_solution]
+        
+        # Keep track of positions we've modified
+        positions = [(r, c) for r in range(size) for c in range(size)]
+        random.shuffle(positions)
+        
+        # First pass: remove values to reach target difficulty
+        removed_positions = []
+        for r, c in positions:
+            if len(removed_positions) >= total_cells - target_clues:
+                break
+                
+            # Temporarily remove this value
+            temp_val = working_board[r][c]
+            working_board[r][c] = None
+            removed_positions.append((r, c, temp_val))
+        
+        # If we don't need a unique solution, we're done
+        if not unique_solution:
+            return cls(working_board, sub_grid_width, sub_grid_height), 1 - (target_clues / total_cells)
+            
+        # Otherwise, we need to check and possibly backtrack
+        attempts = 0
+        
+        # Collections to track cells we've tried to add back
+        tried_add_back = set()
+        
+        while attempts < max_attempts:
+            # Create a solver with the current working board
+            test_solver = cls(working_board, sub_grid_width, sub_grid_height)
+            
+            # Check if there's a unique solution
+            solutions = test_solver.find_all_solutions(max_solutions=2)
+            
+            if len(solutions) == 1:
+                # We found a board with a unique solution
+                # Calculate actual difficulty achieved
+                filled_cells = sum(1 for r in range(size) for c in range(size) if working_board[r][c] is not None)
+                actual_difficulty = 1 - (filled_cells / total_cells)
+                
+                return cls(working_board, sub_grid_width, sub_grid_height), actual_difficulty
+            
+            # We have multiple solutions, need to add back a value
+            if not removed_positions:
+                # No more values to add back - this happens when extreme difficulty removes too many clues
+                # Making it impossible to guarantee uniqueness without adding back many values
+                break
+                
+            # Try to find a position to restore that we haven't tried before
+            found_new_position = False
+            for i in range(len(removed_positions)):
+                r, c, val = removed_positions[i]
+                if (r, c) not in tried_add_back:
+                    # Add back this value
+                    working_board[r][c] = val
+                    tried_add_back.add((r, c))
+                    removed_positions.pop(i)
+                    found_new_position = True
+                    break
+            
+            if not found_new_position:
+                # We've tried all positions, no unique solution possible with current constraints
+                # Reset tried_add_back and pick a random position
+                tried_add_back.clear()
+                if removed_positions:
+                    i = random.randrange(len(removed_positions))
+                    r, c, val = removed_positions.pop(i)
+                    working_board[r][c] = val
+            
+            attempts += 1
+        
+        # If we reached max attempts, return the best we could do
+        filled_cells = sum(1 for r in range(size) for c in range(size) if working_board[r][c] is not None)
+        actual_difficulty = 1 - (filled_cells / total_cells)
+        
+        return cls(working_board, sub_grid_width, sub_grid_height), actual_difficulty
+    
+    @classmethod
     def from_string(cls, sudoku_string, sub_grid_width=3, sub_grid_height=None, delimiter=None):
         """
         Create a SudokuMIPSolver instance from a string representation.
