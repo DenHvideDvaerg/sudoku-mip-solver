@@ -7,7 +7,6 @@ A tool for solving Sudoku puzzles using Mixed Integer Programming (MIP).
 import argparse
 import time
 import sys
-from sudoku import Sudoku
 from sudoku_mip_solver import SudokuMIPSolver
 
 
@@ -27,6 +26,8 @@ def parse_arguments():
         "-f", "--file", 
         help="Path to a file containing the puzzle"
     )
+    ## TODO: Change so that this flag only generates and returns a random puzzle. It shouldn't solve it. 
+    # The default (no input) already generates a random puzzle so this flag is redundant.
     input_group.add_argument(
         "-r", "--random", 
         action="store_true", 
@@ -49,13 +50,17 @@ def parse_arguments():
     )
     
     # Random puzzle options
-    # TODO: Replace with our own...
     random_group = parser.add_argument_group("Random Puzzle Options")
     random_group.add_argument(
         "-d", "--difficulty", 
         type=float, 
         default=0.5,
         help="Difficulty of random puzzles (0.0-1.0, default: 0.5)"
+    )
+    random_group.add_argument(
+        "--non-unique",
+        action="store_true",
+        help="Skip multiplicity check for random puzzles, allowing non-unique solutions (default: unique solutions)"
     )
     
     # Solver options
@@ -75,6 +80,7 @@ def parse_arguments():
     
     # Output options
     output_group = parser.add_argument_group("Output Options")
+    # TODO: Pretty should be the default, so remove this flag?
     output_group.add_argument(
         "-p", "--pretty", 
         action="store_true",
@@ -110,11 +116,21 @@ def main():
         if args.verbose:
             print(f"Generating random puzzle with difficulty {args.difficulty}...")
         height = args.height if args.height is not None else args.width
-        puzzle = Sudoku(args.width, height).difficulty(args.difficulty)
-        board = puzzle.board
+        # Use SudokuMIPSolver.generate_random_puzzle
+        solver, actual_difficulty = SudokuMIPSolver.generate_random_puzzle(
+            sub_grid_width=args.width,
+            sub_grid_height=height,
+            target_difficulty=args.difficulty,
+            unique_solution=not args.non_unique
+        )
+        board = solver.board
         if args.pretty:
-            print("Generated puzzle:")
-            puzzle.show()
+            print(f"Generated puzzle (difficulty: {actual_difficulty:.2f}):")
+            solver.pretty_print(board)
+        else:
+            print(f"Generated puzzle (difficulty: {actual_difficulty:.2f}):")
+            for row in board:
+                print(row)
     elif args.string:
         if args.verbose:
             print("Using provided string as puzzle input...")
@@ -155,14 +171,25 @@ def main():
         if args.verbose:
             print("No input specified, generating random puzzle...")
         height = args.height if args.height is not None else args.width
-        puzzle = Sudoku(args.width, height).difficulty(args.difficulty)
-        board = puzzle.board
+        # Use SudokuMIPSolver.generate_random_puzzle
+        solver, actual_difficulty = SudokuMIPSolver.generate_random_puzzle(
+            sub_grid_width=args.width,
+            sub_grid_height=height,
+            target_difficulty=args.difficulty,
+            unique_solution=not args.non_unique
+        )
+        board = solver.board
         if args.pretty:
-            print("Generated puzzle:")
-            puzzle.show()
+            print(f"Generated puzzle (difficulty: {actual_difficulty:.2f}):")
+            solver.pretty_print(board)
+        else:
+            print(f"Generated puzzle (difficulty: {actual_difficulty:.2f}):")
+            for row in board:
+                print(row)
     
     # Create and solve the puzzle
     if not 'solver' in locals():
+        # TODO: All code paths should create a solver instance, restructure also just to avoid the duplicated code for random board...
         height = args.height if args.height is not None else args.width
         solver = SudokuMIPSolver(board, args.width, height)
     
