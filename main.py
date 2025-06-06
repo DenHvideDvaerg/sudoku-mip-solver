@@ -17,6 +17,7 @@ def parse_arguments():
     )
     
     # Input options
+    # The default behavior (no input) generates AND solves a random puzzle
     input_group = parser.add_argument_group("Input Options")
     input_group.add_argument(
         "-s", "--string", 
@@ -25,13 +26,13 @@ def parse_arguments():
     input_group.add_argument(
         "-f", "--file", 
         help="Path to a file containing the puzzle"
-    )
-    ## TODO: Change so that this flag only generates and returns a random puzzle. It shouldn't solve it. 
-    # The default (no input) already generates a random puzzle so this flag is redundant.
+    )    
+
+    # The -r/--random flag only generates a puzzle without solving it
     input_group.add_argument(
         "-r", "--random", 
         action="store_true", 
-        help="Generate a random puzzle"
+        help="Generate a random puzzle without solving it"
     )
     
     # Grid dimensions
@@ -104,6 +105,32 @@ def read_puzzle_from_file(filepath):
         print(f"Error reading file: {e}")
         sys.exit(1)
 
+def generate_random_puzzle(args):
+    """Generate a random puzzle with the provided arguments and display message."""
+    if args.verbose:
+        print(f"Generating random puzzle with target difficulty {args.difficulty}...")
+    
+    height = args.height if args.height is not None else args.width
+    
+    # Generate the random puzzle
+    solver, actual_difficulty = SudokuMIPSolver.generate_random_puzzle(
+        sub_grid_width=args.width,
+        sub_grid_height=height,
+        target_difficulty=args.difficulty,
+        unique_solution=not args.non_unique
+    )
+    board = solver.board
+    
+    # Display the puzzle
+    if args.pretty:
+        print(f"Generated puzzle (actual difficulty: {actual_difficulty:.2f}):")
+        solver.pretty_print(board)
+    else:
+        print(f"Generated puzzle (actual difficulty: {actual_difficulty:.2f}):")
+        for row in board:
+            print(row)
+            
+    return solver, board
 
 def main():
     """Main entry point for the Sudoku solver."""
@@ -113,24 +140,7 @@ def main():
     
     # Determine puzzle source and create the board
     if args.random:
-        if args.verbose:
-            print(f"Generating random puzzle with difficulty {args.difficulty}...")
-        height = args.height if args.height is not None else args.width
-        # Use SudokuMIPSolver.generate_random_puzzle
-        solver, actual_difficulty = SudokuMIPSolver.generate_random_puzzle(
-            sub_grid_width=args.width,
-            sub_grid_height=height,
-            target_difficulty=args.difficulty,
-            unique_solution=not args.non_unique
-        )
-        board = solver.board
-        if args.pretty:
-            print(f"Generated puzzle (difficulty: {actual_difficulty:.2f}):")
-            solver.pretty_print(board)
-        else:
-            print(f"Generated puzzle (difficulty: {actual_difficulty:.2f}):")
-            for row in board:
-                print(row)
+        solver, board = generate_random_puzzle(args)
     elif args.string:
         if args.verbose:
             print("Using provided string as puzzle input...")
@@ -168,30 +178,17 @@ def main():
             sys.exit(1)
     else:
         # Default: generate a random puzzle
+        solver, board = generate_random_puzzle(args)
+        
+    # Skip solving if --random flag was used
+    if args.random:
         if args.verbose:
-            print("No input specified, generating random puzzle...")
-        height = args.height if args.height is not None else args.width
-        # Use SudokuMIPSolver.generate_random_puzzle
-        solver, actual_difficulty = SudokuMIPSolver.generate_random_puzzle(
-            sub_grid_width=args.width,
-            sub_grid_height=height,
-            target_difficulty=args.difficulty,
-            unique_solution=not args.non_unique
-        )
-        board = solver.board
-        if args.pretty:
-            print(f"Generated puzzle (difficulty: {actual_difficulty:.2f}):")
-            solver.pretty_print(board)
-        else:
-            print(f"Generated puzzle (difficulty: {actual_difficulty:.2f}):")
-            for row in board:
-                print(row)
-    
-    # Create and solve the puzzle
+            total_time = time.time() - start_time
+            print(f"\nTotal execution time: {total_time:.4f} seconds")
+        return  # Exit function without solving
+        
     if not 'solver' in locals():
-        # TODO: All code paths should create a solver instance, restructure also just to avoid the duplicated code for random board...
-        height = args.height if args.height is not None else args.width
-        solver = SudokuMIPSolver(board, args.width, height)
+        raise RuntimeError("Internal error: solver not initialized")
     
     # Find one or all solutions
     if args.all:

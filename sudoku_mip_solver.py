@@ -209,6 +209,7 @@ class SudokuMIPSolver:
         """
         import random
         # TODO: Pass random seed to backend solver as well
+        # TODO: Improve the backtracking logic to get actual difficulty closer to target
 
         # Set random seed if provided
         if random_seed is not None:
