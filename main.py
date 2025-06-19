@@ -65,18 +65,12 @@ def parse_arguments():
     )
     
     # Solver options
-    # TODO: Change to one option that is max_solutions (defaults to 1, -1 for all)?
     solver_group = parser.add_argument_group("Solver Options")
-    solver_group.add_argument(
-        "-a", "--all", 
-        action="store_true",
-        help="Find all solutions instead of just one"
-    )
     solver_group.add_argument(
         "-m", "--max-solutions", 
         type=int, 
-        default=None,
-        help="Maximum number of solutions to find (default: unlimited)"
+        default=1,
+        help="Maximum number of solutions to find (default: 1, use -1 for all solutions)"
     )
     
     # Output options
@@ -166,16 +160,34 @@ def main():
             print(f"\nTotal execution time: {total_time:.4f} seconds")
         return  # Exit function without solving
         
-    if not 'solver' in locals():
+    if 'solver' not in locals():
         raise RuntimeError("Internal error: solver not initialized")
     
-    # Find one or all solutions
-    if args.all:
+    # Find one or more solutions based on max_solutions
+    if args.max_solutions == 1:
+        # Find a single solution
         if args.verbose:
-            print(f"Finding {'all' if args.max_solutions is None else args.max_solutions} solution(s)...")
+            print("Finding a single solution...")
+            
+        solve_start = time.time()
+        has_solution = solver.solve()
+        solve_time = time.time() - solve_start
+        
+        if has_solution:
+            if args.verbose:
+                print(f"Solution found in {solve_time:.4f} seconds:")
+            solver.pretty_print(solver.current_solution)
+        else:
+            print("No solution found!")
+    else:
+        # Find multiple or all solutions
+        max_sols = None if args.max_solutions == -1 else args.max_solutions
+        
+        if args.verbose:
+            print(f"Finding {'all' if max_sols is None else f'up to {max_sols}'} solution(s)...")
         
         solve_start = time.time()
-        all_solutions = solver.find_all_solutions(max_solutions=args.max_solutions)
+        all_solutions = solver.find_all_solutions(max_solutions=max_sols)
         solve_time = time.time() - solve_start
         
         if all_solutions:
@@ -191,21 +203,6 @@ def main():
                 solver.pretty_print(solution)
         else:
             print("No solutions found!")
-    else:
-        if args.verbose:
-            print("Finding a single solution...")
-            
-        solve_start = time.time()
-        has_solution = solver.solve()
-        solve_time = time.time() - solve_start
-        
-        if has_solution:
-            if args.verbose:
-                print(f"Solution found in {solve_time:.4f} seconds:")
-                
-            solver.pretty_print(solver.current_solution)
-        else:
-            print("No solution found!")
     
     # if args.verbose:
     #     print("\nModel details:")
