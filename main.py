@@ -28,10 +28,10 @@ def parse_arguments():
         help="Path to a file containing the puzzle"
     )    
 
-    # The -r/--random flag only generates a puzzle without solving it
+    # The --generate-only flag only generates a puzzle without solving it
     input_group.add_argument(
-        "-r", "--random", 
-        action="store_true", 
+        "--generate-only",
+        action="store_true",
         help="Generate a random puzzle without solving it"
     )
     
@@ -122,8 +122,12 @@ def main():
     start_time = time.time()
     
     # Determine puzzle source and create the board
-    if args.random:
-        solver, board = generate_random_puzzle(args)
+    if args.generate_only:
+        generate_random_puzzle(args)
+        if args.verbose:
+            total_time = time.time() - start_time
+            print(f"\nTotal execution time: {total_time:.4f} seconds")
+        return  # Exit function without solving
     elif args.string:
         if args.verbose:
             print("Using provided string as puzzle input...")
@@ -152,13 +156,6 @@ def main():
     else:
         # Default: generate a random puzzle
         solver, board = generate_random_puzzle(args)
-        
-    # Skip solving if --random flag was used
-    if args.random:
-        if args.verbose:
-            total_time = time.time() - start_time
-            print(f"\nTotal execution time: {total_time:.4f} seconds")
-        return  # Exit function without solving
         
     if 'solver' not in locals():
         raise RuntimeError("Internal error: solver not initialized")
