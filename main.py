@@ -81,12 +81,6 @@ def parse_arguments():
     
     # Output options
     output_group = parser.add_argument_group("Output Options")
-    # TODO: Pretty should be the default, so remove this flag?
-    output_group.add_argument(
-        "-p", "--pretty", 
-        action="store_true",
-        help="Pretty print the puzzle and solution(s)"
-    )
     output_group.add_argument(
         "-v", "--verbose", 
         action="store_true",
@@ -122,13 +116,8 @@ def generate_random_puzzle(args):
     board = solver.board
     
     # Display the puzzle
-    if args.pretty:
-        print(f"Generated puzzle (actual difficulty: {actual_difficulty:.2f}):")
-        solver.pretty_print(board)
-    else:
-        print(f"Generated puzzle (actual difficulty: {actual_difficulty:.2f}):")
-        for row in board:
-            print(row)
+    print(f"Generated puzzle (actual difficulty: {actual_difficulty:.2f}):")
+    solver.pretty_print(board)
             
     return solver, board
 
@@ -148,13 +137,8 @@ def main():
         try:
             solver = SudokuMIPSolver.from_string(args.string, args.width, height)
             board = solver.board
-            if args.pretty:
-                print("Input puzzle:")
-                solver.pretty_print(board)
-            else:
-                print("Input puzzle:")
-                for row in board:
-                    print(row)
+            print("Input puzzle:")
+            solver.pretty_print(board)
         except Exception as e:
             print(f"Error parsing puzzle string: {e}")
             sys.exit(1)
@@ -166,13 +150,8 @@ def main():
         try:
             solver = SudokuMIPSolver.from_string(puzzle_string, args.width, height)
             board = solver.board
-            if args.pretty:
-                print("Puzzle from file:")
-                solver.pretty_print(board)
-            else:
-                print("Puzzle from file:")
-                for row in board:
-                    print(row)
+            print("Puzzle from file:")
+            solver.pretty_print(board)
         except Exception as e:
             print(f"Error parsing puzzle from file: {e}")
             sys.exit(1)
@@ -209,11 +188,7 @@ def main():
                 
             for idx, solution in enumerate(all_solutions):
                 print(f"\nSolution {idx + 1}:")
-                if args.pretty:
-                    solver.pretty_print(solution)
-                else:
-                    for row in solution:
-                        print(row)
+                solver.pretty_print(solution)
         else:
             print("No solutions found!")
     else:
@@ -228,11 +203,7 @@ def main():
             if args.verbose:
                 print(f"Solution found in {solve_time:.4f} seconds:")
                 
-            if args.pretty:
-                solver.pretty_print(solver.current_solution)
-            else:
-                for row in solver.current_solution:
-                    print(row)
+            solver.pretty_print(solver.current_solution)
         else:
             print("No solution found!")
     
