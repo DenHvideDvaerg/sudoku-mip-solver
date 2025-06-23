@@ -154,7 +154,6 @@ class TestSudokuMIPSolverInit:
         assert solver.size == 4
         assert all(all(cell is None for cell in row) for row in solver.board)
 
-
 class TestSudokuMIPSolverFromString:
     """Test cases for SudokuMIPSolver.from_string class method."""
     
@@ -252,7 +251,7 @@ class TestSudokuMIPSolverFromString:
         ]
         assert solver.board == expected_board
     
-    def test_from_string_with_whitespace(self):
+    def test_from_string_whitespace(self):
         """Test that whitespace is properly removed from input string."""
         sudoku_string = """1 2 3 4
                           0 0 0 0
@@ -419,15 +418,45 @@ class TestSudokuMIPSolverFromString:
             SudokuMIPSolver.from_string(sudoku_string, 5, 2)
     
     def test_from_string_whitespace_handling_delimited(self):
-        """Test proper whitespace handling in delimited strings."""
-        # String with extra whitespace around values
-        values = ["1", "2", "0", "4"] + ["0"] * 12  # Exactly 16 values
-        sudoku_string = "  " + " ,  ".join(values) + "  "  # Extra spaces around commas
+        """Test proper whitespace handling in delimited strings."""        
+        values = ["1", "2", "0", "4"] + ["0"] * 12
+        sudoku_string = "  " + " ,  ".join(values) + "  "
         
         solver = SudokuMIPSolver.from_string(sudoku_string, 2, 2, delimiter=",")
         
         assert solver.size == 4
         assert solver.board[0] == [1, 2, None, 4]
+
+class TestSudokuMIPSolverToString:
+    """Test cases for the to_string method."""
+
+    def test_to_string_9x9_no_delimiter(self):
+        """Test converting a 9x9 board to a string without a delimiter."""
+        sudoku_string = "700006200080001007046070300060090000050040020000010040009020570500100080008900003"
+        solver = SudokuMIPSolver.from_string(sudoku_string)
+        assert solver.to_string() == sudoku_string
+
+    def test_to_string_4x4_with_delimiter(self):
+        """Test converting a 4x4 board with a specified delimiter."""
+        sudoku_string = "1003200040010000"
+        solver = SudokuMIPSolver.from_string(sudoku_string, 2, 2)
+        expected_string = "1,0,0,3,2,0,0,0,4,0,0,1,0,0,0,0"
+        assert solver.to_string(delimiter=",") == expected_string
+
+    def test_to_string_on_solution(self):
+        """Test converting a solution board to a string."""
+        board = [[None for _ in range(4)] for _ in range(4)]
+        solver = SudokuMIPSolver(board, 2)
+        solution_board = [
+            [1, 2, 3, 4],
+            [3, 4, 1, 2],
+            [2, 1, 4, 3],
+            [4, 3, 2, 1]
+        ]
+        solver.current_solution = solution_board
+        expected_string = "1234341221434321"
+        assert solver.to_string(board=solver.current_solution) == expected_string
+
 
 class TestSudokuMIPSolverBuildModel:
     """Test cases for SudokuMIPSolver.build_model method."""

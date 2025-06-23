@@ -156,6 +156,35 @@ class SudokuMIPSolver:
             raise ValueError("No solution found yet. Please call solve() first.")
         return self.current_solution
     
+    def to_string(self, board=None, delimiter=None):
+        """
+        Convert a board to a string representation.
+
+        Parameters:
+        - board: The board to convert. If None, uses the instance's board.
+        - delimiter: The delimiter to use between values. If None, values are
+                     concatenated directly for boards up to 9x9. For larger boards,
+                     a space is used as a default delimiter.
+
+        Returns:
+        - A string representation of the board.
+        """
+        target_board = board if board is not None else self.board
+
+        if self.size > 9 and delimiter is None:
+            delimiter = ' '
+
+        flat_board = []
+        for r in range(self.size):
+            for c in range(self.size):
+                value = target_board[r][c]
+                flat_board.append(str(value if value is not None else 0))
+
+        if delimiter is not None:
+            return delimiter.join(flat_board)
+        else:
+            return "".join(flat_board)
+    
     def print_model(self):
         """Print the model in a readable format."""
         print(f"Objective: {self.model.objective.value()}")

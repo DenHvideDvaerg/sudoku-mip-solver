@@ -123,7 +123,8 @@ def main():
     
     # Determine puzzle source and create the board
     if args.generate_only:
-        generate_random_puzzle(args)
+        solver, board = generate_random_puzzle(args)
+        print(solver.to_string(board=board))
         if args.verbose:
             total_time = time.time() - start_time
             print(f"\nTotal execution time: {total_time:.4f} seconds")
