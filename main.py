@@ -111,9 +111,8 @@ def read_puzzle_from_file(filepath):
     try:
         with open(filepath, 'r') as file:
             return file.read().strip()
-    except Exception as e:
-        print(f"Error reading file: {e}", file=sys.stderr)
-        sys.exit(1)
+    except IOError as e:
+        raise IOError(f"Error reading file '{filepath}': {e}") from e
 
 def save_to_file(filepath, content, description):
     """Save content to a file with error handling."""
@@ -151,121 +150,123 @@ def generate_random_puzzle(args):
             
     return solver, board
 
-def main():
-    """Main entry point for the Sudoku solver."""
-    args = parse_arguments()
-    try:
-        validate_arguments(args)
-    except ValueError as e:
-        print(e, file=sys.stderr)
-        sys.exit(1)
 
-    start_time = time.time()
+def get_solver(args):
+    """Initialize the Sudoku solver based on input arguments."""
+    height = args.height if args.height is not None else args.width
     
-    # Determine puzzle source and create the board
-    if args.generate_only:
-        solver, board = generate_random_puzzle(args)
-        if not args.quiet:
-            print(solver.to_string(board=board))
-        if args.output:
-            save_to_file(args.output, solver.to_string(board=board), "generated puzzle")
-        if args.verbose:
-            total_time = time.time() - start_time
-            print(f"\nTotal execution time: {total_time:.4f} seconds")
-        return  # Exit function without solving
-    elif args.string:
+    if args.string:
         if args.verbose:
             print("Using provided string as puzzle input...")
-        height = args.height if args.height is not None else args.width
-        try:
-            solver = SudokuMIPSolver.from_string(args.string, args.width, height)
-            board = solver.board
-            if not args.quiet:
-                print("Input puzzle:")
-                solver.pretty_print(board)
-        except Exception as e:
-            print(f"Error parsing puzzle string: {e}", file=sys.stderr)
-            sys.exit(1)
+        solver = SudokuMIPSolver.from_string(args.string, args.width, height)
+        if not args.quiet:
+            print("Input puzzle:")
+            solver.pretty_print(solver.board)
+        return solver
     elif args.file:
         if args.verbose:
             print(f"Reading puzzle from file: {args.file}")
         puzzle_string = read_puzzle_from_file(args.file)
-        height = args.height if args.height is not None else args.width
-        try:
-            solver = SudokuMIPSolver.from_string(puzzle_string, args.width, height)
-            board = solver.board
-            if not args.quiet:
-                print("Puzzle from file:")
-                solver.pretty_print(board)
-        except Exception as e:
-            print(f"Error parsing puzzle from file: {e}", file=sys.stderr)
-            sys.exit(1)
+        solver = SudokuMIPSolver.from_string(puzzle_string, args.width, height)
+        if not args.quiet:
+            print("Puzzle from file:")
+            solver.pretty_print(solver.board)
+        return solver
     else:
         # Default: generate a random puzzle
-        solver, board = generate_random_puzzle(args)
-        
-    if 'solver' not in locals():
-        raise RuntimeError("Internal error: solver not initialized")
-    
-    # Find one or more solutions based on max_solutions
-    if args.max_solutions == 1:
-        # Find a single solution
-        if args.verbose:
-            print("Finding a single solution...")
-            
-        solve_start = time.time()
-        has_solution = solver.solve()
-        solve_time = time.time() - solve_start
-        
-        if has_solution:
-            if args.verbose:
-                print(f"Solution found in {solve_time:.4f} seconds:")
-            if not args.quiet:
-                solver.pretty_print(solver.current_solution)
-            if args.output:
-                save_to_file(args.output, solver.to_string(board=solver.current_solution), "solution")
-        else:
-            print("No solution found!", file=sys.stderr)
-    else:
-        # Find multiple or all solutions
-        max_sols = None if args.max_solutions == -1 else args.max_solutions
-        
-        if args.verbose:
-            print(f"Finding {'all' if max_sols is None else f'up to {max_sols}'} solution(s)...")
-        
-        solve_start = time.time()
-        all_solutions = solver.find_all_solutions(max_solutions=max_sols)
-        solve_time = time.time() - solve_start
-        
-        if all_solutions:
-            if args.verbose:
-                print(f"Found {len(all_solutions)} solution(s) in {solve_time:.4f} seconds")
+        solver, _ = generate_random_puzzle(args)
+        return solver
 
-            if not args.quiet:
-                for idx, solution in enumerate(all_solutions):
+
+def save_solutions(solver, solutions, filepath):
+    """Save one or more solutions to a file."""
+    if len(solutions) == 1:
+        content = solver.to_string(board=solutions[0])
+        description = "solution"
+    else:
+        all_solutions_text = []
+        for idx, solution in enumerate(solutions):
+            all_solutions_text.append(f"Solution {idx + 1}:\n{solver.to_string(board=solution)}")
+        content = "\n\n".join(all_solutions_text)
+        description = "solutions"
+    
+    save_to_file(filepath, content, description)
+
+
+def solve_and_report(solver, args):
+    """Solve the puzzle and report the solution(s)."""
+    solve_start = time.time()
+
+    if args.verbose:
+        if args.max_solutions == 1:
+            print("Finding a single solution...")
+        else:
+            max_sols_str = 'all' if args.max_solutions == -1 else f'up to {args.max_solutions}'
+            print(f"Finding {max_sols_str} solution(s)...")
+
+    if args.max_solutions == 1:
+        has_solution = solver.solve()
+        solutions = [solver.current_solution] if has_solution else []
+    else:
+        max_sols = None if args.max_solutions == -1 else args.max_solutions
+        solutions = solver.find_all_solutions(max_solutions=max_sols)
+
+    solve_time = time.time() - solve_start
+
+    if solutions:
+        if args.verbose:
+            if args.max_solutions == 1:
+                print(f"Solution found in {solve_time:.4f} seconds:")
+            else:
+                print(f"Found {len(solutions)} solution(s) in {solve_time:.4f} seconds")
+        
+        if not args.quiet:
+            if len(solutions) == 1:
+                 solver.pretty_print(solutions[0])
+            else:
+                for idx, solution in enumerate(solutions):
                     print(f"\nSolution {idx + 1}:")
                     solver.pretty_print(solution)
-            
-            if args.output:
-                # For multiple solutions, save all of them
-                if len(all_solutions) == 1:
-                    save_to_file(args.output, solver.to_string(board=all_solutions[0]), "solution")
-                else:
-                    # Save all solutions with numbered format
-                    all_solutions_text = ""
-                    for idx, solution in enumerate(all_solutions):
-                        all_solutions_text += f"Solution {idx + 1}:\n"
-                        all_solutions_text += solver.to_string(board=solution)
-                        if idx < len(all_solutions) - 1:
-                            all_solutions_text += "\n\n"
-                    save_to_file(args.output, all_solutions_text, "solutions")
+        
+        if args.output:
+            save_solutions(solver, solutions, args.output)
+    else:
+        print("No solution found!", file=sys.stderr)
+
+
+def main_generate_only(args):
+    """Handle the --generate-only mode."""
+    solver, board = generate_random_puzzle(args)
+    if not args.quiet:
+        print(solver.to_string(board=board))
+    if args.output:
+        save_to_file(args.output, solver.to_string(board=board), "generated puzzle")
+
+def main():
+    """Main entry point for the Sudoku solver."""
+    try:
+        args = parse_arguments()
+        validate_arguments(args)
+        
+        start_time = time.time()
+
+        if args.generate_only:
+            main_generate_only(args)
         else:
-            print("No solutions found!", file=sys.stderr)
-    
-    
-    if args.verbose:
-        total_time = time.time() - start_time
-        print(f"\nTotal execution time: {total_time:.4f} seconds")
+            solver = get_solver(args)
+            solve_and_report(solver, args)
+
+        if args.verbose:
+            total_time = time.time() - start_time
+            print(f"\nTotal execution time: {total_time:.4f} seconds")
+
+    except (ValueError, IOError) as e:
+        print(e, file=sys.stderr)
+        sys.exit(1)
+    except Exception as e:
+        # Catch any other unexpected errors
+        print(f"An unexpected error occurred: {e}", file=sys.stderr)
+        sys.exit(1)
 
 
 if __name__ == "__main__":
