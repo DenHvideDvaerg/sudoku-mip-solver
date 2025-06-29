@@ -44,7 +44,7 @@ def parse_arguments():
         help="Width of each sub-grid (default: 3)"
     )
     grid_group.add_argument(
-        "-ht", "--height", 
+        "-H", "--height", 
         type=int, 
         default=None,
         help="Height of each sub-grid (default: same as width)"
@@ -96,15 +96,15 @@ def parse_arguments():
 def validate_arguments(args):
     """Validate parsed command line arguments."""
     if args.width <= 0:
-        raise ValueError("Error: --width must be a positive integer.")
+        raise ValueError("--width must be a positive integer.")
     if args.height is not None and args.height <= 0:
-        raise ValueError("Error: --height must be a positive integer.")
+        raise ValueError("--height must be a positive integer.")
     
     if not (0.0 <= args.difficulty <= 1.0):
-        raise ValueError("Error: --difficulty must be between 0.0 and 1.0.")
+        raise ValueError("--difficulty must be between 0.0 and 1.0.")
 
     if args.max_solutions < -1 or args.max_solutions == 0:
-        raise ValueError("Error: --max-solutions must be a positive integer or -1 for all solutions.")
+        raise ValueError("--max-solutions must be a positive integer or -1 for all solutions.")
 
 def read_puzzle_from_file(filepath):
     """Read a Sudoku puzzle from a file."""
