@@ -100,6 +100,7 @@ def generate_random_puzzle(args):
     height = args.height if args.height is not None else args.width
     
     # Generate the random puzzle
+    start_time = time.time()
     solver, actual_difficulty = SudokuMIPSolver.generate_random_puzzle(
         sub_grid_width=args.width,
         sub_grid_height=height,
@@ -108,6 +109,10 @@ def generate_random_puzzle(args):
     )
     board = solver.board
     
+    if args.verbose:
+        generation_time = time.time() - start_time
+        print(f"Puzzle generated in {generation_time:.4f} seconds")
+
     # Display the puzzle
     print(f"Generated puzzle (actual difficulty: {actual_difficulty:.2f}):")
     solver.pretty_print(board)
@@ -188,22 +193,15 @@ def main():
         solve_time = time.time() - solve_start
         
         if all_solutions:
-            print(f"Found {len(all_solutions)} solution(s) in {solve_time:.4f} seconds")
-                
-            if len(all_solutions) == 1:
-                print("The solution is unique!")
-            else:
-                print("Multiple solutions exist for this puzzle.")
-                
+            if args.verbose:
+                print(f"Found {len(all_solutions)} solution(s) in {solve_time:.4f} seconds")
+
             for idx, solution in enumerate(all_solutions):
                 print(f"\nSolution {idx + 1}:")
                 solver.pretty_print(solution)
         else:
             print("No solutions found!")
     
-    # if args.verbose:
-    #     print("\nModel details:")
-    #     solver.print_model()
     
     if args.verbose:
         total_time = time.time() - start_time
