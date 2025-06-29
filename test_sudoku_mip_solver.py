@@ -154,7 +154,6 @@ class TestSudokuMIPSolverInit:
         assert solver.size == 4
         assert all(all(cell is None for cell in row) for row in solver.board)
 
-
 class TestSudokuMIPSolverFromString:
     """Test cases for SudokuMIPSolver.from_string class method."""
     
@@ -252,7 +251,7 @@ class TestSudokuMIPSolverFromString:
         ]
         assert solver.board == expected_board
     
-    def test_from_string_with_whitespace(self):
+    def test_from_string_whitespace(self):
         """Test that whitespace is properly removed from input string."""
         sudoku_string = """1 2 3 4
                           0 0 0 0
@@ -419,15 +418,45 @@ class TestSudokuMIPSolverFromString:
             SudokuMIPSolver.from_string(sudoku_string, 5, 2)
     
     def test_from_string_whitespace_handling_delimited(self):
-        """Test proper whitespace handling in delimited strings."""
-        # String with extra whitespace around values
-        values = ["1", "2", "0", "4"] + ["0"] * 12  # Exactly 16 values
-        sudoku_string = "  " + " ,  ".join(values) + "  "  # Extra spaces around commas
+        """Test proper whitespace handling in delimited strings."""        
+        values = ["1", "2", "0", "4"] + ["0"] * 12
+        sudoku_string = "  " + " ,  ".join(values) + "  "
         
         solver = SudokuMIPSolver.from_string(sudoku_string, 2, 2, delimiter=",")
         
         assert solver.size == 4
         assert solver.board[0] == [1, 2, None, 4]
+
+class TestSudokuMIPSolverToString:
+    """Test cases for the to_string method."""
+
+    def test_to_string_9x9_no_delimiter(self):
+        """Test converting a 9x9 board to a string without a delimiter."""
+        sudoku_string = "700006200080001007046070300060090000050040020000010040009020570500100080008900003"
+        solver = SudokuMIPSolver.from_string(sudoku_string)
+        assert solver.to_string() == sudoku_string
+
+    def test_to_string_4x4_with_delimiter(self):
+        """Test converting a 4x4 board with a specified delimiter."""
+        sudoku_string = "1003200040010000"
+        solver = SudokuMIPSolver.from_string(sudoku_string, 2, 2)
+        expected_string = "1,0,0,3,2,0,0,0,4,0,0,1,0,0,0,0"
+        assert solver.to_string(delimiter=",") == expected_string
+
+    def test_to_string_on_solution(self):
+        """Test converting a solution board to a string."""
+        board = [[None for _ in range(4)] for _ in range(4)]
+        solver = SudokuMIPSolver(board, 2)
+        solution_board = [
+            [1, 2, 3, 4],
+            [3, 4, 1, 2],
+            [2, 1, 4, 3],
+            [4, 3, 2, 1]
+        ]
+        solver.current_solution = solution_board
+        expected_string = "1234341221434321"
+        assert solver.to_string(board=solver.current_solution) == expected_string
+
 
 class TestSudokuMIPSolverBuildModel:
     """Test cases for SudokuMIPSolver.build_model method."""
@@ -856,3 +885,145 @@ class TestSudokuMIPSolverSolve:
                     for c in range(3):
                         box_values.append(solver.current_solution[box_r*3 + r][box_c*3 + c])
                 assert sorted(box_values) == list(range(1, 10))
+
+class TestSudokuMIPSolverRandomPuzzle:
+    """Test cases for SudokuMIPSolver.generate_random_puzzle method."""
+
+    def test_basic_puzzle_generation(self):
+        """Test that a basic random puzzle can be generated successfully."""
+        solver, difficulty = SudokuMIPSolver.generate_random_puzzle()
+        
+        # Check that we got a valid solver instance
+        assert isinstance(solver, SudokuMIPSolver)
+        assert solver.size == 9
+        assert solver.sub_grid_width == 3
+        assert solver.sub_grid_height == 3
+        
+        # Check that difficulty is within expected range
+        assert 0.0 <= difficulty <= 1.0
+        
+        # Check board has some values filled in
+        filled_cells = sum(1 for r in range(9) for c in range(9) if solver.board[r][c] is not None)
+        assert filled_cells > 0
+        
+        # Verify the puzzle has a solution
+        assert solver.solve()
+    
+    def test_random_seed_control(self):
+        """Test that providing the same random seed produces the same puzzle."""
+        # Generate two puzzles with the same seed
+        solver1, diff1 = SudokuMIPSolver.generate_random_puzzle(random_seed=42)
+        solver2, diff2 = SudokuMIPSolver.generate_random_puzzle(random_seed=42)
+        
+        # Generate a puzzle with a different seed
+        solver3, _ = SudokuMIPSolver.generate_random_puzzle(random_seed=24)
+        
+        # The first two should be identical
+        assert solver1.board == solver2.board
+        assert diff1 == diff2
+        
+        # The third should be different
+        assert solver1.board != solver3.board
+    
+    def test_difficulty_levels(self):
+        """Test that different difficulty levels produce appropriately different puzzles."""
+        # Generate easy puzzle (more filled cells)
+        solver_easy, diff_easy = SudokuMIPSolver.generate_random_puzzle(
+            target_difficulty=0.2, unique_solution=False, random_seed=42
+        )
+        
+        # Generate hard puzzle (fewer filled cells)
+        solver_hard, diff_hard = SudokuMIPSolver.generate_random_puzzle(
+            target_difficulty=0.8, unique_solution=False, random_seed=42
+        )
+        
+        filled_easy = sum(1 for r in range(9) for c in range(9) 
+                          if solver_easy.board[r][c] is not None)
+        filled_hard = sum(1 for r in range(9) for c in range(9) 
+                          if solver_hard.board[r][c] is not None)
+        
+        # Hard should have fewer filled cells than easy
+        assert filled_hard < filled_easy
+        # Difficulty values should reflect the difference
+        assert diff_hard > diff_easy
+    
+    def test_unique_solution(self):
+        """Test that puzzles with unique_solution=True have only one solution."""
+        # Generate puzzle with unique solution requirement
+        solver, _ = SudokuMIPSolver.generate_random_puzzle(
+            target_difficulty=0.5, unique_solution=True, max_attempts=10
+        )
+        
+        # Test it has exactly one solution
+        solutions = solver.find_all_solutions(max_solutions=2)
+        assert len(solutions) == 1
+    
+    def test_non_unique_solution(self):
+        """Test that puzzles with unique_solution=False may have multiple solutions."""
+        # Note: This doesn't guarantee multiple solutions, but allows for them
+        # random_seed = 1 with target_difficulty=0.95 gives a puzzle with multiple solutions
+        solver, _ = SudokuMIPSolver.generate_random_puzzle(
+            target_difficulty=0.95, unique_solution=False, random_seed=1
+        )
+        
+        # Get solutions (up to 3)
+        solutions = solver.find_all_solutions(max_solutions=3)
+        
+        # Check that it has multiple solutions
+        assert len(solutions) > 1
+    
+    def test_invalid_difficulty(self):
+        """Test that invalid difficulty values raise ValueError."""
+        # Test negative difficulty
+        with pytest.raises(ValueError, match="Difficulty must be between 0.0 and 1.0"):
+            SudokuMIPSolver.generate_random_puzzle(target_difficulty=-0.1)
+          # Test difficulty > 1.0
+        with pytest.raises(ValueError, match="Difficulty must be between 0.0 and 1.0"):
+            SudokuMIPSolver.generate_random_puzzle(target_difficulty=1.1)
+    
+    def test_different_board_sizes(self):
+        """Test generating puzzles with different board sizes."""
+        # 6x6 puzzle (2x3 sub-grids)
+        solver_6x6, _ = SudokuMIPSolver.generate_random_puzzle(
+            sub_grid_width=2, sub_grid_height=3
+        )
+        assert solver_6x6.size == 6
+        assert solver_6x6.sub_grid_width == 2
+        assert solver_6x6.sub_grid_height == 3
+        
+        # 12x12 puzzle (3x4 sub-grids)
+        solver_12x12, _ = SudokuMIPSolver.generate_random_puzzle(
+            sub_grid_width=3, sub_grid_height=4
+        )
+        assert solver_12x12.size == 12
+        assert solver_12x12.sub_grid_width == 3
+        assert solver_12x12.sub_grid_height == 4
+        
+        # Verify these are valid solvable puzzles
+        assert solver_6x6.solve()
+        assert solver_12x12.solve()
+    
+    def test_actual_vs_target_difficulty(self):
+        """Test the relationship between target difficulty and actual achieved difficulty."""
+        # With unique_solution=True, the actual difficulty may differ from the target
+        target = 0.7
+        solver, actual = SudokuMIPSolver.generate_random_puzzle(
+            target_difficulty=target, unique_solution=True
+        )
+        
+        # The actual difficulty should be a float between 0 and 1
+        assert isinstance(actual, float)
+        assert 0.0 <= actual <= 1.0
+        assert actual <= target
+    
+    def test_max_attempts(self):
+        """Test that max_attempts parameter limits generation attempts."""
+        # Set a very difficult target that might be impossible to achieve with uniqueness
+        # and limit attempts to just 1
+        solver, actual = SudokuMIPSolver.generate_random_puzzle(
+            target_difficulty=0.99, unique_solution=True, max_attempts=1
+        )
+        
+        # Should still return a valid puzzle even if it couldn't meet the difficulty target
+        assert isinstance(solver, SudokuMIPSolver)
+        assert solver.solve()
