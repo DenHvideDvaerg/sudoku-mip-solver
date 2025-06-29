@@ -75,6 +75,10 @@ def parse_arguments():
     
     # Output options
     output_group = parser.add_argument_group("Output Options")
+    output_group.add_argument(
+        "-o", "--output",
+        help="Save the solution or generated puzzle to a file"
+    )
     verbosity_group = output_group.add_mutually_exclusive_group()
     verbosity_group.add_argument(
         "-v", "--verbose", 
@@ -97,6 +101,14 @@ def read_puzzle_from_file(filepath):
     except Exception as e:
         print(f"Error reading file: {e}", file=sys.stderr)
         sys.exit(1)
+
+def save_to_file(filepath, content, description):
+    """Save content to a file with error handling."""
+    try:
+        with open(filepath, 'w') as file:
+            file.write(content)
+    except Exception as e:
+        print(f"Error saving {description} to file '{filepath}': {e}", file=sys.stderr)
 
 def generate_random_puzzle(args):
     """Generate a random puzzle with the provided arguments and display message."""
@@ -137,6 +149,8 @@ def main():
         solver, board = generate_random_puzzle(args)
         if not args.quiet:
             print(solver.to_string(board=board))
+        if args.output:
+            save_to_file(args.output, solver.to_string(board=board), "generated puzzle")
         if args.verbose:
             total_time = time.time() - start_time
             print(f"\nTotal execution time: {total_time:.4f} seconds")
@@ -190,6 +204,8 @@ def main():
                 print(f"Solution found in {solve_time:.4f} seconds:")
             if not args.quiet:
                 solver.pretty_print(solver.current_solution)
+            if args.output:
+                save_to_file(args.output, solver.to_string(board=solver.current_solution), "solution")
         else:
             print("No solution found!", file=sys.stderr)
     else:
@@ -211,6 +227,20 @@ def main():
                 for idx, solution in enumerate(all_solutions):
                     print(f"\nSolution {idx + 1}:")
                     solver.pretty_print(solution)
+            
+            if args.output:
+                # For multiple solutions, save all of them
+                if len(all_solutions) == 1:
+                    save_to_file(args.output, solver.to_string(board=all_solutions[0]), "solution")
+                else:
+                    # Save all solutions with numbered format
+                    all_solutions_text = ""
+                    for idx, solution in enumerate(all_solutions):
+                        all_solutions_text += f"Solution {idx + 1}:\n"
+                        all_solutions_text += solver.to_string(board=solution)
+                        if idx < len(all_solutions) - 1:
+                            all_solutions_text += "\n\n"
+                    save_to_file(args.output, all_solutions_text, "solutions")
         else:
             print("No solutions found!", file=sys.stderr)
     
