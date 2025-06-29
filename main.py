@@ -75,10 +75,16 @@ def parse_arguments():
     
     # Output options
     output_group = parser.add_argument_group("Output Options")
-    output_group.add_argument(
+    verbosity_group = output_group.add_mutually_exclusive_group()
+    verbosity_group.add_argument(
         "-v", "--verbose", 
         action="store_true",
         help="Show detailed solver information"
+    )
+    verbosity_group.add_argument(
+        "-q", "--quiet",
+        action="store_true", 
+        help="Suppress all output except error messages"
     )
 
     return parser.parse_args()
@@ -89,7 +95,7 @@ def read_puzzle_from_file(filepath):
         with open(filepath, 'r') as file:
             return file.read().strip()
     except Exception as e:
-        print(f"Error reading file: {e}")
+        print(f"Error reading file: {e}", file=sys.stderr)
         sys.exit(1)
 
 def generate_random_puzzle(args):
@@ -114,8 +120,9 @@ def generate_random_puzzle(args):
         print(f"Puzzle generated in {generation_time:.4f} seconds")
 
     # Display the puzzle
-    print(f"Generated puzzle (actual difficulty: {actual_difficulty:.2f}):")
-    solver.pretty_print(board)
+    if not args.quiet:
+        print(f"Generated puzzle (actual difficulty: {actual_difficulty:.2f}):")
+        solver.pretty_print(board)
             
     return solver, board
 
@@ -128,7 +135,8 @@ def main():
     # Determine puzzle source and create the board
     if args.generate_only:
         solver, board = generate_random_puzzle(args)
-        print(solver.to_string(board=board))
+        if not args.quiet:
+            print(solver.to_string(board=board))
         if args.verbose:
             total_time = time.time() - start_time
             print(f"\nTotal execution time: {total_time:.4f} seconds")
@@ -140,10 +148,11 @@ def main():
         try:
             solver = SudokuMIPSolver.from_string(args.string, args.width, height)
             board = solver.board
-            print("Input puzzle:")
-            solver.pretty_print(board)
+            if not args.quiet:
+                print("Input puzzle:")
+                solver.pretty_print(board)
         except Exception as e:
-            print(f"Error parsing puzzle string: {e}")
+            print(f"Error parsing puzzle string: {e}", file=sys.stderr)
             sys.exit(1)
     elif args.file:
         if args.verbose:
@@ -153,10 +162,11 @@ def main():
         try:
             solver = SudokuMIPSolver.from_string(puzzle_string, args.width, height)
             board = solver.board
-            print("Puzzle from file:")
-            solver.pretty_print(board)
+            if not args.quiet:
+                print("Puzzle from file:")
+                solver.pretty_print(board)
         except Exception as e:
-            print(f"Error parsing puzzle from file: {e}")
+            print(f"Error parsing puzzle from file: {e}", file=sys.stderr)
             sys.exit(1)
     else:
         # Default: generate a random puzzle
@@ -178,9 +188,10 @@ def main():
         if has_solution:
             if args.verbose:
                 print(f"Solution found in {solve_time:.4f} seconds:")
-            solver.pretty_print(solver.current_solution)
+            if not args.quiet:
+                solver.pretty_print(solver.current_solution)
         else:
-            print("No solution found!")
+            print("No solution found!", file=sys.stderr)
     else:
         # Find multiple or all solutions
         max_sols = None if args.max_solutions == -1 else args.max_solutions
@@ -196,11 +207,12 @@ def main():
             if args.verbose:
                 print(f"Found {len(all_solutions)} solution(s) in {solve_time:.4f} seconds")
 
-            for idx, solution in enumerate(all_solutions):
-                print(f"\nSolution {idx + 1}:")
-                solver.pretty_print(solution)
+            if not args.quiet:
+                for idx, solution in enumerate(all_solutions):
+                    print(f"\nSolution {idx + 1}:")
+                    solver.pretty_print(solution)
         else:
-            print("No solutions found!")
+            print("No solutions found!", file=sys.stderr)
     
     
     if args.verbose:
