@@ -18,7 +18,7 @@ def parse_arguments():
     
     # Input options
     # The default behavior (no input) generates AND solves a random puzzle
-    input_group = parser.add_argument_group("Input Options")
+    input_group = parser.add_mutually_exclusive_group()
     input_group.add_argument(
         "-s", "--string", 
         help="Input puzzle as a string (e.g., '530070000600195000098000060800060003400803001700020006060000280000419005000080079')"
@@ -82,7 +82,6 @@ def parse_arguments():
     )
 
     return parser.parse_args()
-
 
 def read_puzzle_from_file(filepath):
     """Read a Sudoku puzzle from a file."""
