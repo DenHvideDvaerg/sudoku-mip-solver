@@ -263,7 +263,13 @@ class SudokuMIPSolver:
         
         # Step 3: Calculate target clues based on difficulty
         total_cells = size * size
-        min_clues = max(1, size)  # Theoretical minimum for 9x9 is 17
+        
+        # Set minimum number of clues
+        # For 9x9 puzzles, mathematical studies have shown 17 is the minimum
+        # For other sizes, we use the size as a reasonable lower bound
+        min_clues = max(1, size)
+        if size == 9:
+            min_clues = 17  # Known theoretical minimum for standard 9x9 Sudoku (https://arxiv.org/abs/1201.0749)
         max_clues = total_cells  # Allow completely filled puzzles
         
         # Map difficulty from 0.0-1.0 to number of clues (inverse relationship)
@@ -349,6 +355,9 @@ class SudokuMIPSolver:
         
         # Step 6: Calculate the actual difficulty achieved
         actual_clues = sum(1 for r in range(size) for c in range(size) if current_board[r][c] is not None)
+        
+        # Calculate normalized difficulty from 0.0 (easiest) to 1.0 (hardest)
+        # using the theoretical minimum clues as the hardest difficulty
         actual_difficulty = 1 - ((actual_clues - min_clues) / (max_clues - min_clues))
         
         return cls(current_board, sub_grid_width, sub_grid_height), actual_difficulty
