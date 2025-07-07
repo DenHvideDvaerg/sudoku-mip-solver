@@ -286,12 +286,12 @@ class SudokuMIPSolver:
             iteration = 0
             
             # Step 5a: Try aggressive removal first to quickly get closer to target
-            aggressive_board, aggressive_clues = cls._try_aggressive_removal(
+            aggressive_board, aggressive_clues, aggressive_success = cls._try_aggressive_removal(
                 complete_solution, positions[:], target_clues, min_clues, 
                 sub_grid_width, sub_grid_height
             )
             
-            if aggressive_board:
+            if aggressive_success:
                 current_board = aggressive_board
                 current_clues = aggressive_clues
             
@@ -304,13 +304,14 @@ class SudokuMIPSolver:
                     
                 # Try batch removal when we're far from target (speeds up generation)
                 if current_clues > target_clues + 10 and iteration < max_iterations // 3:
-                    success, new_clues = cls._try_batch_cell_removal(
+                    batch_board, batch_clues, batch_success = cls._try_batch_cell_removal(
                         current_board, untried_positions, current_clues, target_clues,
                         sub_grid_width, sub_grid_height, tried_positions
                     )
                     
-                    if success:
-                        current_clues = new_clues
+                    if batch_success:
+                        current_board = batch_board
+                        current_clues = batch_clues
                         iteration += 1
                         continue
                 
@@ -401,7 +402,10 @@ class SudokuMIPSolver:
         - sub_grid_width, sub_grid_height: Dimensions of sub-grids
         
         Returns:
-        - tuple: (modified_board, current_clues) if successful, (None, None) if failed
+        - tuple: (board, clues_count, success)
+          - board: Modified board if successful, copy of input board if failed
+          - clues_count: Number of clues in the returned board
+          - success: Boolean indicating whether aggressive removal succeeded
         """
 
         # Copy the complete solution to work on
@@ -426,12 +430,13 @@ class SudokuMIPSolver:
             
             if len(solutions) == 1:
                 # Success! We've found a valid aggressive starting point
-                return board, current_clues
+                return board, current_clues, True
         except Exception:
-            # If solution finding fails, return None to indicate failure
+            # If solution finding fails, return original board
             pass
             
-        return None, None
+        # If we get here, aggressive removal failed
+        return [row[:] for row in complete_solution], total_cells, False
     
     @classmethod
     def _try_batch_cell_removal(cls, current_board, untried_positions, current_clues, target_clues, 
@@ -448,46 +453,52 @@ class SudokuMIPSolver:
         - tried_positions: Set of already tried positions (will be modified)
         
         Returns:
-        - tuple: (success, new_clues_count) - success is True if cells were removed
+        - tuple: (board, clues_count, success)
+          - board: Modified board (will have changes if success=True)
+          - clues_count: Number of clues in the returned board
+          - success: Boolean indicating whether cells were removed
         """
+        
+        # Make a copy to avoid modifying the input board in case of failure
+        board = [row[:] for row in current_board]
         
         # Identify cells that can be candidates for removal
         removal_candidates = [(r, c) for r, c in untried_positions 
-                            if current_board[r][c] is not None]
+                            if board[r][c] is not None]
         
         if not removal_candidates:
-            return False, current_clues
+            return board, current_clues, False
             
         # Determine batch size - remove more cells when far from target
         batch_size = min(3, len(removal_candidates), current_clues - target_clues)
         batch_to_remove = random.sample(removal_candidates, batch_size)
         
         # Store original values in case we need to restore them
-        original_values = [(r, c, current_board[r][c]) for r, c in batch_to_remove]
+        original_values = [(r, c, board[r][c]) for r, c in batch_to_remove]
         
         # Remove the batch of cells
         for r, c in batch_to_remove:
-            current_board[r][c] = None
+            board[r][c] = None
             tried_positions.add((r, c))
         
         # Test if the puzzle still has a unique solution
         try:
-            test_solver = cls(current_board, sub_grid_width, sub_grid_height)
+            test_solver = cls(board, sub_grid_width, sub_grid_height)
             solutions = test_solver.find_all_solutions(max_solutions=2)
             
             if len(solutions) == 1:
                 # Success - we can keep these cells removed
-                return True, current_clues - batch_size
+                return board, current_clues - batch_size, True
             else:
                 # Not unique - restore all cells
                 for r, c, val in original_values:
-                    current_board[r][c] = val
-                return False, current_clues
+                    board[r][c] = val
+                return board, current_clues, False
         except Exception:
             # On error, restore all values
             for r, c, val in original_values:
-                current_board[r][c] = val
-            return False, current_clues
+                board[r][c] = val
+            return board, current_clues, False
 
     @classmethod
     def from_string(cls, sudoku_string, sub_grid_width=3, sub_grid_height=None, delimiter=None):
