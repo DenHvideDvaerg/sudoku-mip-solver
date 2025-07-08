@@ -55,8 +55,8 @@ def parse_arguments():
     random_group.add_argument(
         "-d", "--difficulty", 
         type=float, 
-        default=0.5,
-        help="Difficulty of random puzzles (0.0-1.0, default: 0.5)"
+        default=0.75,
+        help="Controls number of clues in generated puzzles (0.0=maximum clues/easiest, 1.0=minimum clues/hardest, default: 0.75)"
     )
     random_group.add_argument(
         "--non-unique",
@@ -145,7 +145,29 @@ def generate_random_puzzle(args):
 
     # Display the puzzle
     if not args.quiet:
-        print(f"Generated puzzle (actual difficulty: {actual_difficulty:.2f}):")
+        # Calculate and display puzzle difficulty information
+        size = solver.size
+        total_cells = size * size
+        filled_cells = sum(1 for r in range(size) for c in range(size) if board[r][c] is not None)
+        min_possible = max(1, size)
+        
+        if size == 9:
+            min_possible = 17  # Known minimum for 9x9 Sudoku
+            min_known = True
+        else:
+            min_known = False  # For other sizes, we don't know the true minimum
+        
+        # Calculate the difficulty we actually achieved as a percentage of theoretical maximum
+        achievement_percentage = (actual_difficulty / 1.0) * 100
+        
+        print(f"Generated puzzle (difficulty: {actual_difficulty:.2f}, {filled_cells}/{total_cells} clues):")
+        
+        if min_known:
+            print(f"[Min possible: {min_possible} clues (proven), " 
+                  f"Achieved: {achievement_percentage:.1f}% of theoretical max]")
+        else:
+            print(f"[Min estimated: {min_possible} clues (lower bound), " 
+                  f"Achieved: {achievement_percentage:.1f}% of theoretical max]")
         solver.pretty_print(board)
             
     return solver, board

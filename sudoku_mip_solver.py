@@ -1,4 +1,5 @@
 import pulp
+import random
 
 class SudokuMIPSolver: 
     def __init__(self, board: list[list[int]], sub_grid_width: int, sub_grid_height: int = None):
@@ -215,18 +216,19 @@ class SudokuMIPSolver:
         self.current_solution = None
         
         return self.model
-    
+
+    # TODO: Pass random_seed to solver (when that is implemented)
     @classmethod
-    def generate_random_puzzle(cls, sub_grid_width=3, sub_grid_height=None, target_difficulty=0.5, 
-                              unique_solution=True, max_attempts=100, random_seed=None):
+    def generate_random_puzzle(cls, sub_grid_width=3, sub_grid_height=None, target_difficulty=0.75, 
+                        unique_solution=True, max_attempts=100, random_seed=None):
         """
         Generate a random Sudoku puzzle with a specified difficulty level.
         
         Parameters:
         - sub_grid_width: Width of the sub-grid (defaults to 3 for standard 9x9 Sudoku)
         - sub_grid_height: Height of the sub-grid (defaults to sub_grid_width)
-        - target_difficulty: Float between 0.0 and 1.0 indicating desired difficulty
-                            (0.0 = easiest/all filled, 1.0 = hardest/minimal clues)
+        - target_difficulty: Float between 0.0 and 1.0 controlling number of clues
+                            (0.0 = maximum clues/easiest, 1.0 = minimum clues/hardest)
                             This is a target and may not be achieved exactly if unique_solution=True
         - unique_solution: Whether the puzzle must have exactly one solution
         - max_attempts: Maximum number of attempts to achieve target difficulty with unique solution
@@ -236,14 +238,11 @@ class SudokuMIPSolver:
         - A new SudokuMIPSolver instance with the generated puzzle
         - The actual difficulty achieved (may differ from target if unique_solution=True)
         """
-        import random
-        # TODO: Pass random seed to backend solver as well
-        # TODO: Improve the backtracking logic to get actual difficulty closer to target
-
+        
         # Set random seed if provided
         if random_seed is not None:
             random.seed(random_seed)
-            
+        
         if sub_grid_height is None:
             sub_grid_height = sub_grid_width
             
@@ -253,12 +252,151 @@ class SudokuMIPSolver:
         if not 0.0 <= target_difficulty <= 1.0:
             raise ValueError("Difficulty must be between 0.0 and 1.0")
             
-        # Create an empty board
-        empty_board = [[None for _ in range(size)] for _ in range(size)]
+        # Create and initialize the board with values on diagonal sub-grids
+        initial_board = cls._initialize_puzzle_grid(size, sub_grid_width, sub_grid_height)
+
+        # Solve the initial board to get a complete valid solution
+        solver = cls(initial_board, sub_grid_width, sub_grid_height)
+        if not solver.solve():
+            raise RuntimeError("Failed to generate initial solution")
         
-        # Add random values along the diagonals of sub-grids
-        # This ensures no conflicts and provides a valid starting point
-        for i in range(0, size, sub_grid_height):
+        complete_solution = [row[:] for row in solver.current_solution]
+        
+        # Calculate target clues based on difficulty
+        total_cells = size * size
+        
+        # Set minimum number of clues
+        # For 9x9 puzzles, mathematical studies have shown 17 is the minimum
+        # For other sizes, we use the size as a reasonable lower bound
+        min_clues = max(1, size)
+        if size == 9:
+            min_clues = 17  # Known theoretical minimum for standard 9x9 Sudoku (https://arxiv.org/abs/1201.0749)
+        max_clues = total_cells  # Allow completely filled puzzles
+        
+        # Map difficulty from 0.0-1.0 to number of clues (inverse relationship)
+        target_clues = int(min_clues + (1 - target_difficulty) * (max_clues - min_clues))
+        
+        # Start with the complete solution and remove cells to reach target difficulty
+        current_board = [row[:] for row in complete_solution]
+        current_clues = total_cells
+        
+        # Create ordered list of positions and shuffle for randomness
+        positions = [(r, c) for r in range(size) for c in range(size)]
+        random.shuffle(positions)
+        
+        # Track positions we've tried to remove
+        tried_positions = set()
+        
+        # Apply cell removal strategy based on whether unique solution is required
+        if unique_solution:
+            max_iterations = min(max_attempts, total_cells)
+            iteration = 0
+            
+            # Try aggressive removal first to quickly get closer to target
+            aggressive_board, aggressive_clues, aggressive_success = cls._try_aggressive_removal(
+                complete_solution, positions[:], target_clues, min_clues, 
+                sub_grid_width, sub_grid_height
+            )
+            
+            if aggressive_success:
+                current_board = aggressive_board
+                current_clues = aggressive_clues
+            
+            # Main removal loop - remove cells while preserving unique solution
+            while current_clues > target_clues and iteration < max_iterations and tried_positions != set(positions):
+                # Find positions we haven't tried yet
+                untried_positions = [pos for pos in positions if pos not in tried_positions]
+                if not untried_positions:
+                    break
+                    
+                # Try batch removal when we're far from target (speeds up generation)
+                if current_clues > target_clues + 10 and iteration < max_iterations // 3:
+                    batch_board, batch_clues, batch_success = cls._try_batch_cell_removal(
+                        current_board, untried_positions, current_clues, target_clues,
+                        sub_grid_width, sub_grid_height, tried_positions
+                    )
+                    
+                    if batch_success:
+                        current_board = batch_board
+                        current_clues = batch_clues
+                        iteration += 1
+                        continue
+                
+                # Single cell removal when closer to target or batch removal failed
+                r, c = random.choice(untried_positions)
+                tried_positions.add((r, c))
+                
+                # Remember the value we're removing
+                temp_val = current_board[r][c]
+                current_board[r][c] = None
+                
+                # Check if still unique solution with error handling
+                try:
+                    test_solver = cls(current_board, sub_grid_width, sub_grid_height)
+                    solutions = test_solver.find_all_solutions(max_solutions=2)
+                    
+                    if len(solutions) == 1:
+                        # Success - we can keep this cell removed
+                        current_clues -= 1
+                    else:
+                        # Not unique anymore, put back the value
+                        current_board[r][c] = temp_val
+                except Exception:
+                    # On error, put back the value
+                    current_board[r][c] = temp_val
+                
+                iteration += 1
+        else:
+            # If unique solution not required, simply remove cells until target is reached
+            for r, c in positions:
+                if current_clues <= target_clues:
+                    break
+                current_board[r][c] = None
+                current_clues -= 1
+        
+        # Calculate the actual difficulty achieved
+        actual_clues = sum(1 for r in range(size) for c in range(size) if current_board[r][c] is not None)
+        
+        # Calculate normalized difficulty from 0.0 (easiest) to 1.0 (hardest)
+        # using the theoretical minimum clues as the hardest difficulty
+        actual_difficulty = 1 - ((actual_clues - min_clues) / (max_clues - min_clues))
+        
+        return cls(current_board, sub_grid_width, sub_grid_height), actual_difficulty
+    
+    @classmethod
+    def _initialize_puzzle_grid(cls, size, sub_grid_width, sub_grid_height):
+        """
+        Initialize an empty Sudoku grid and fill the diagonal sub-grids with random values.
+        This creates a valid starting point for puzzle generation.
+        
+        Parameters:
+        - size: Size of the Sudoku grid (width/height)
+        - sub_grid_width: Width of each sub-grid
+        - sub_grid_height: Height of each sub-grid
+        
+        Returns:
+        - An initialized board with diagonal sub-grids filled
+        """
+        
+        # Create an empty board
+        board = [[None for _ in range(size)] for _ in range(size)]
+        
+        # For non-square sub-grids, we need to be careful about the stride when filling diagonal boxes
+        # to ensure we don't get out of bounds or overlap
+        
+        # Calculate how many sub-grids we have in each dimension
+        num_vertical_blocks = size // sub_grid_height
+        num_horizontal_blocks = size // sub_grid_width
+        
+        # We'll fill the minimum number of diagonal blocks possible
+        num_diagonal_blocks = min(num_vertical_blocks, num_horizontal_blocks)
+        
+        # Fill diagonal sub-grids
+        for block_idx in range(num_diagonal_blocks):
+            # Calculate the starting indices for this diagonal block
+            start_row = block_idx * sub_grid_height
+            start_col = block_idx * sub_grid_width
+            
             # Get valid values for this sub-grid (1 to size)
             values = list(range(1, size + 1))
             random.shuffle(values)
@@ -266,108 +404,125 @@ class SudokuMIPSolver:
             # Fill the diagonal sub-grid
             for r in range(sub_grid_height):
                 for c in range(sub_grid_width):
-                    row_idx = i + r
-                    col_idx = i + c
+                    row_idx = start_row + r
+                    col_idx = start_col + c
                     if row_idx < size and col_idx < size:
-                        empty_board[row_idx][col_idx] = values.pop(0)
+                        board[row_idx][col_idx] = values.pop(0)
         
-        # Create a solver with the initial board
-        solver = cls(empty_board, sub_grid_width, sub_grid_height)
+        return board
+    
+    @classmethod
+    def _try_aggressive_removal(cls, complete_solution, positions, target_clues, min_clues, 
+                               sub_grid_width, sub_grid_height):
+        """
+        Attempt aggressive cell removal to quickly approach target difficulty.
         
-        # Solve to get a complete valid solution
-        if not solver.solve():
-            # This should never happen given our initialization
-            raise RuntimeError("Failed to generate initial solution")
+        Parameters:
+        - complete_solution: The complete solved Sudoku board
+        - positions: List of all cell positions (shuffled)
+        - target_clues: Target number of clues to keep
+        - min_clues: Minimum number of clues required
+        - sub_grid_width, sub_grid_height: Dimensions of sub-grids
         
-        # Get the complete solution
-        complete_solution = [row[:] for row in solver.current_solution]
+        Returns:
+        - tuple: (board, clues_count, success)
+          - board: Modified board if successful, copy of input board if failed
+          - clues_count: Number of clues in the returned board
+          - success: Boolean indicating whether aggressive removal succeeded
+        """
+
+        # Copy the complete solution to work on
+        board = [row[:] for row in complete_solution]
+        total_cells = len(board) * len(board[0])
+        current_clues = total_cells
         
-        # Calculate number of cells to keep based on difficulty
-        total_cells = size * size
-        min_clues = 17 if size == 9 else max(1, size)  # Theoretical minimum for 9x9 is 17 (https://arxiv.org/abs/1201.0749)
-        max_clues = total_cells - 1  # We need at least one empty cell
+        # Calculate an aggressive target (try to remove 10% more than needed)
+        aggressive_clues = max(min_clues, target_clues - int(0.1 * total_cells))
         
-        # Linear interpolation between min and max clues based on difficulty
-        target_clues = int(max_clues - target_difficulty * (max_clues - min_clues))
-        
-        # Create a copy of the complete solution to remove values from
-        working_board = [row[:] for row in complete_solution]
-        
-        # Keep track of positions we've modified
-        positions = [(r, c) for r in range(size) for c in range(size)]
-        random.shuffle(positions)
-        
-        # First pass: remove values to reach target difficulty
-        removed_positions = []
+        # Remove cells to reach aggressive target
         for r, c in positions:
-            if len(removed_positions) >= total_cells - target_clues:
+            if current_clues <= aggressive_clues:
                 break
-                
-            # Temporarily remove this value
-            temp_val = working_board[r][c]
-            working_board[r][c] = None
-            removed_positions.append((r, c, temp_val))
+            board[r][c] = None
+            current_clues -= 1
         
-        # If we don't need a unique solution, we're done
-        if not unique_solution:
-            return cls(working_board, sub_grid_width, sub_grid_height), 1 - (target_clues / total_cells)
-            
-        # Otherwise, we need to check and possibly backtrack
-        attempts = 0
-        
-        # Collections to track cells we've tried to add back
-        tried_add_back = set()
-        
-        while attempts < max_attempts:
-            # Create a solver with the current working board
-            test_solver = cls(working_board, sub_grid_width, sub_grid_height)
-            
-            # Check if there's a unique solution
+        try:
+            # Check if still has a unique solution
+            test_solver = cls(board, sub_grid_width, sub_grid_height)
             solutions = test_solver.find_all_solutions(max_solutions=2)
             
             if len(solutions) == 1:
-                # We found a board with a unique solution
-                # Calculate actual difficulty achieved
-                filled_cells = sum(1 for r in range(size) for c in range(size) if working_board[r][c] is not None)
-                actual_difficulty = 1 - (filled_cells / total_cells)
-                
-                return cls(working_board, sub_grid_width, sub_grid_height), actual_difficulty
+                # Success! We've found a valid aggressive starting point
+                return board, current_clues, True
+        except Exception:
+            # If solution finding fails, return original board
+            pass
             
-            # We have multiple solutions, need to add back a value
-            if not removed_positions:
-                # No more values to add back - this happens when extreme difficulty removes too many clues
-                # Making it impossible to guarantee uniqueness without adding back many values
-                break
-                
-            # Try to find a position to restore that we haven't tried before
-            found_new_position = False
-            for i in range(len(removed_positions)):
-                r, c, val = removed_positions[i]
-                if (r, c) not in tried_add_back:
-                    # Add back this value
-                    working_board[r][c] = val
-                    tried_add_back.add((r, c))
-                    removed_positions.pop(i)
-                    found_new_position = True
-                    break
-            
-            if not found_new_position:
-                # We've tried all positions, no unique solution possible with current constraints
-                # Reset tried_add_back and pick a random position
-                tried_add_back.clear()
-                if removed_positions:
-                    i = random.randrange(len(removed_positions))
-                    r, c, val = removed_positions.pop(i)
-                    working_board[r][c] = val
-            
-            attempts += 1
-        
-        # If we reached max attempts, return the best we could do
-        filled_cells = sum(1 for r in range(size) for c in range(size) if working_board[r][c] is not None)
-        actual_difficulty = 1 - (filled_cells / total_cells)
-        
-        return cls(working_board, sub_grid_width, sub_grid_height), actual_difficulty
+        # If we get here, aggressive removal failed
+        return [row[:] for row in complete_solution], total_cells, False
     
+    @classmethod
+    def _try_batch_cell_removal(cls, current_board, untried_positions, current_clues, target_clues, 
+                               sub_grid_width, sub_grid_height, tried_positions):
+        """
+        Try removing multiple cells at once to speed up puzzle generation.
+        
+        Parameters:
+        - current_board: Current state of the puzzle
+        - untried_positions: List of positions not yet tried for removal
+        - current_clues: Current number of clues in the puzzle
+        - target_clues: Target number of clues
+        - sub_grid_width, sub_grid_height: Dimensions of sub-grids
+        - tried_positions: Set of already tried positions (will be modified)
+        
+        Returns:
+        - tuple: (board, clues_count, success)
+          - board: Modified board (will have changes if success=True)
+          - clues_count: Number of clues in the returned board
+          - success: Boolean indicating whether cells were removed
+        """
+        
+        # Make a copy to avoid modifying the input board in case of failure
+        board = [row[:] for row in current_board]
+        
+        # Identify cells that can be candidates for removal
+        removal_candidates = [(r, c) for r, c in untried_positions 
+                            if board[r][c] is not None]
+        
+        if not removal_candidates:
+            return board, current_clues, False
+            
+        # Determine batch size - remove more cells when far from target
+        batch_size = min(3, len(removal_candidates), current_clues - target_clues)
+        batch_to_remove = random.sample(removal_candidates, batch_size)
+        
+        # Store original values in case we need to restore them
+        original_values = [(r, c, board[r][c]) for r, c in batch_to_remove]
+        
+        # Remove the batch of cells
+        for r, c in batch_to_remove:
+            board[r][c] = None
+            tried_positions.add((r, c))
+        
+        # Test if the puzzle still has a unique solution
+        try:
+            test_solver = cls(board, sub_grid_width, sub_grid_height)
+            solutions = test_solver.find_all_solutions(max_solutions=2)
+            
+            if len(solutions) == 1:
+                # Success - we can keep these cells removed
+                return board, current_clues - batch_size, True
+            else:
+                # Not unique - restore all cells
+                for r, c, val in original_values:
+                    board[r][c] = val
+                return board, current_clues, False
+        except Exception:
+            # On error, restore all values
+            for r, c, val in original_values:
+                board[r][c] = val
+            return board, current_clues, False
+
     @classmethod
     def from_string(cls, sudoku_string, sub_grid_width=3, sub_grid_height=None, delimiter=None):
         """
