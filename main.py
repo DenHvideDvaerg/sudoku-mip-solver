@@ -55,8 +55,8 @@ def parse_arguments():
     random_group.add_argument(
         "-d", "--difficulty", 
         type=float, 
-        default=0.5,
-        help="Difficulty of random puzzles (0.0-1.0, default: 0.5)"
+        default=0.75,
+        help="Controls number of clues in generated puzzles (0.0=maximum clues/easiest, 1.0=minimum clues/hardest, default: 0.75)"
     )
     random_group.add_argument(
         "--non-unique",

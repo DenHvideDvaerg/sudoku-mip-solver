@@ -226,8 +226,8 @@ class SudokuMIPSolver:
         Parameters:
         - sub_grid_width: Width of the sub-grid (defaults to 3 for standard 9x9 Sudoku)
         - sub_grid_height: Height of the sub-grid (defaults to sub_grid_width)
-        - target_difficulty: Float between 0.0 and 1.0 indicating desired difficulty
-                            (0.0 = easiest/many clues, 1.0 = hardest/minimal clues)
+        - target_difficulty: Float between 0.0 and 1.0 controlling number of clues
+                            (0.0 = maximum clues/easiest, 1.0 = minimum clues/hardest)
                             This is a target and may not be achieved exactly if unique_solution=True
         - unique_solution: Whether the puzzle must have exactly one solution
         - max_attempts: Maximum number of attempts to achieve target difficulty with unique solution
