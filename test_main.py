@@ -27,7 +27,7 @@ class TestParseArguments:
         assert args.generate_only is False
         assert args.width == 3
         assert args.height is None
-        assert args.difficulty == 0.5
+        assert args.difficulty == 0.75
         assert args.non_unique is False
         assert args.max_solutions == 1
         assert args.output is None
