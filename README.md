@@ -16,7 +16,7 @@ pip install sudoku-mip-solver
 
 ## Requirements
 
-- Python 3.7+
+- Python 3.9+
 - PuLP (for the MIP solver)
 
 ## Quick Start
@@ -212,4 +212,4 @@ hard_solver.pretty_print(hard_solver.board)
 
 ## License
 
-This project is licensed under the MIT License. TODO...
+TODO
