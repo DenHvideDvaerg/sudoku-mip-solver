@@ -217,6 +217,7 @@ class SudokuMIPSolver:
         
         return self.model
 
+    # TODO: Pass random_seed to solver (when that is implemented)
     @classmethod
     def generate_random_puzzle(cls, sub_grid_width=3, sub_grid_height=None, target_difficulty=0.75, 
                         unique_solution=True, max_attempts=100, random_seed=None):
