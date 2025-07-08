@@ -252,10 +252,10 @@ class SudokuMIPSolver:
             raise ValueError("Difficulty must be between 0.0 and 1.0")
             
         # Step 1: Create and initialize the board with values on diagonal sub-grids
-        empty_board = cls._initialize_puzzle_grid(size, sub_grid_width, sub_grid_height)
+        initial_board = cls._initialize_puzzle_grid(size, sub_grid_width, sub_grid_height)
 
         # Step 2: Solve the initial board to get a complete valid solution
-        solver = cls(empty_board, sub_grid_width, sub_grid_height)
+        solver = cls(initial_board, sub_grid_width, sub_grid_height)
         if not solver.solve():
             raise RuntimeError("Failed to generate initial solution")
         
@@ -378,11 +378,24 @@ class SudokuMIPSolver:
         """
         
         # Create an empty board
-        empty_board = [[None for _ in range(size)] for _ in range(size)]
+        board = [[None for _ in range(size)] for _ in range(size)]
         
-        # Add random values along the diagonals of sub-grids
-        # This ensures no conflicts and provides a valid starting point
-        for i in range(0, size, sub_grid_height):
+        # For non-square sub-grids, we need to be careful about the stride when filling diagonal boxes
+        # to ensure we don't get out of bounds or overlap
+        
+        # Calculate how many sub-grids we have in each dimension
+        num_vertical_blocks = size // sub_grid_height
+        num_horizontal_blocks = size // sub_grid_width
+        
+        # We'll fill the minimum number of diagonal blocks possible
+        num_diagonal_blocks = min(num_vertical_blocks, num_horizontal_blocks)
+        
+        # Fill diagonal sub-grids
+        for block_idx in range(num_diagonal_blocks):
+            # Calculate the starting indices for this diagonal block
+            start_row = block_idx * sub_grid_height
+            start_col = block_idx * sub_grid_width
+            
             # Get valid values for this sub-grid (1 to size)
             values = list(range(1, size + 1))
             random.shuffle(values)
@@ -390,12 +403,12 @@ class SudokuMIPSolver:
             # Fill the diagonal sub-grid
             for r in range(sub_grid_height):
                 for c in range(sub_grid_width):
-                    row_idx = i + r
-                    col_idx = i + c
+                    row_idx = start_row + r
+                    col_idx = start_col + c
                     if row_idx < size and col_idx < size:
-                        empty_board[row_idx][col_idx] = values.pop(0)
+                        board[row_idx][col_idx] = values.pop(0)
         
-        return empty_board
+        return board
     
     @classmethod
     def _try_aggressive_removal(cls, complete_solution, positions, target_clues, min_clues, 
