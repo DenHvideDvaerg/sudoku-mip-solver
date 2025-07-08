@@ -251,17 +251,17 @@ class SudokuMIPSolver:
         if not 0.0 <= target_difficulty <= 1.0:
             raise ValueError("Difficulty must be between 0.0 and 1.0")
             
-        # Step 1: Create and initialize the board with values on diagonal sub-grids
+        # Create and initialize the board with values on diagonal sub-grids
         initial_board = cls._initialize_puzzle_grid(size, sub_grid_width, sub_grid_height)
 
-        # Step 2: Solve the initial board to get a complete valid solution
+        # Solve the initial board to get a complete valid solution
         solver = cls(initial_board, sub_grid_width, sub_grid_height)
         if not solver.solve():
             raise RuntimeError("Failed to generate initial solution")
         
         complete_solution = [row[:] for row in solver.current_solution]
         
-        # Step 3: Calculate target clues based on difficulty
+        # Calculate target clues based on difficulty
         total_cells = size * size
         
         # Set minimum number of clues
@@ -275,7 +275,7 @@ class SudokuMIPSolver:
         # Map difficulty from 0.0-1.0 to number of clues (inverse relationship)
         target_clues = int(min_clues + (1 - target_difficulty) * (max_clues - min_clues))
         
-        # Step 4: Start with the complete solution and remove cells to reach target difficulty
+        # Start with the complete solution and remove cells to reach target difficulty
         current_board = [row[:] for row in complete_solution]
         current_clues = total_cells
         
@@ -286,12 +286,12 @@ class SudokuMIPSolver:
         # Track positions we've tried to remove
         tried_positions = set()
         
-        # Step 5: Apply cell removal strategy based on whether unique solution is required
+        # Apply cell removal strategy based on whether unique solution is required
         if unique_solution:
             max_iterations = min(max_attempts, total_cells)
             iteration = 0
             
-            # Step 5a: Try aggressive removal first to quickly get closer to target
+            # Try aggressive removal first to quickly get closer to target
             aggressive_board, aggressive_clues, aggressive_success = cls._try_aggressive_removal(
                 complete_solution, positions[:], target_clues, min_clues, 
                 sub_grid_width, sub_grid_height
@@ -301,7 +301,7 @@ class SudokuMIPSolver:
                 current_board = aggressive_board
                 current_clues = aggressive_clues
             
-            # Step 5b: Main removal loop - remove cells while preserving unique solution
+            # Main removal loop - remove cells while preserving unique solution
             while current_clues > target_clues and iteration < max_iterations and tried_positions != set(positions):
                 # Find positions we haven't tried yet
                 untried_positions = [pos for pos in positions if pos not in tried_positions]
@@ -353,7 +353,7 @@ class SudokuMIPSolver:
                 current_board[r][c] = None
                 current_clues -= 1
         
-        # Step 6: Calculate the actual difficulty achieved
+        # Calculate the actual difficulty achieved
         actual_clues = sum(1 for r in range(size) for c in range(size) if current_board[r][c] is not None)
         
         # Calculate normalized difficulty from 0.0 (easiest) to 1.0 (hardest)
