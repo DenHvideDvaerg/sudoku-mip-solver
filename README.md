@@ -1,5 +1,7 @@
 # Sudoku MIP Solver
 
+![Tests](https://github.com/DenHvideDvaerg/sudoku-mip-solver/actions/workflows/run-tests.yml/badge.svg)
+
 A Sudoku puzzle solver and generator using Mixed Integer Programming (MIP).
 
 This package provides tools to:
@@ -212,4 +214,4 @@ hard_solver.pretty_print(hard_solver.board)
 
 ## License
 
-TODO
+This project is licensed under the [MIT License](LICENSE).
