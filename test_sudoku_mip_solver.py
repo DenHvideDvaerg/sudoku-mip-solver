@@ -1014,7 +1014,7 @@ class TestSudokuMIPSolverRandomPuzzle:
         # The actual difficulty should be a float between 0 and 1
         assert isinstance(actual, float)
         assert 0.0 <= actual <= 1.0
-        assert actual <= target
+        assert pytest.approx(actual, rel=0.1) == target
     
     def test_max_attempts(self):
         """Test that max_attempts parameter limits generation attempts."""
