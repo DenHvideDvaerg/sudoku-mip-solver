@@ -1,6 +1,7 @@
 # Sudoku MIP Solver
 
-![Tests](https://github.com/DenHvideDvaerg/sudoku-mip-solver/actions/workflows/run-tests.yml/badge.svg)
+[![Tests](https://github.com/DenHvideDvaerg/sudoku-mip-solver/actions/workflows/run-tests.yml/badge.svg)](https://github.com/DenHvideDvaerg/sudoku-mip-solver/actions/workflows/run-tests.yml)
+![Code Coverage](https://img.shields.io/badge/Code%20Coverage-See%20Actions-blue)
 
 A Sudoku puzzle solver and generator using Mixed Integer Programming (MIP).
 
