@@ -1,5 +1,9 @@
 name: CI
 
+# Define the Python version for coverage reporting at the workflow level
+env:
+  COVERAGE_PYTHON_VERSION: '3.12'
+
 on:
   push:
     paths:
@@ -16,8 +20,6 @@ jobs:
     permissions:
       contents: read
       pull-requests: write
-    env:
-      COVERAGE_PYTHON_VERSION: "3.12"  # Version used for coverage reporting
     strategy:
       fail-fast: false
       matrix:
@@ -41,9 +43,19 @@ jobs:
       run: |
         pytest --cov=./ --cov-report=term --cov-report=xml --cov-report=html
         
+    # Only run coverage reporting steps for the specified Python version
+    - name: Check coverage Python version
+      id: check_version
+      run: |
+        if [[ "${{ matrix.python-version }}" == "${{ env.COVERAGE_PYTHON_VERSION }}" ]]; then
+          echo "is_coverage_version=true" >> $GITHUB_OUTPUT
+        else
+          echo "is_coverage_version=false" >> $GITHUB_OUTPUT
+        fi
+        
     - name: Archive HTML coverage results
       uses: actions/upload-artifact@v4
-      if: matrix.python-version == ${{ env.COVERAGE_PYTHON_VERSION }}
+      if: steps.check_version.outputs.is_coverage_version == 'true'
       with:
         name: code-coverage-html
         path: htmlcov/
@@ -51,7 +63,7 @@ jobs:
         
     - name: Code Coverage Summary
       uses: irongut/CodeCoverageSummary@v1.3.0
-      if: matrix.python-version == ${{ env.COVERAGE_PYTHON_VERSION }}
+      if: steps.check_version.outputs.is_coverage_version == 'true'
       with:
         filename: coverage.xml
         badge: true
@@ -62,14 +74,14 @@ jobs:
         
     - name: Add Coverage PR Comment
       uses: marocchino/sticky-pull-request-comment@v2
-      if: matrix.python-version == ${{ env.COVERAGE_PYTHON_VERSION }} && github.event_name == 'pull_request'
+      if: steps.check_version.outputs.is_coverage_version == 'true' && github.event_name == 'pull_request'
       with:
         recreate: true
         path: code-coverage-results.md
         GITHUB_TOKEN: ${{ github.token }}
         
     - name: Write to Job Summary
-      if: matrix.python-version == ${{ env.COVERAGE_PYTHON_VERSION }}
+      if: steps.check_version.outputs.is_coverage_version == 'true'
       run: cat code-coverage-results.md >> $GITHUB_STEP_SUMMARY
 
 
