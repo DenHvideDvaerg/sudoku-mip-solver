@@ -66,3 +66,18 @@ jobs:
         
     - name: Write to Job Summary
       run: cat code-coverage-results.md >> $GITHUB_STEP_SUMMARY
+
+    # Add coverage percentage to job summary for Python 3.12
+    - name: Add coverage percentage to job summary
+      if: matrix.python-version == '3.12'
+      run: |
+        COVERAGE=$(python -c "import xml.etree.ElementTree as ET; tree = ET.parse('coverage.xml'); root = tree.getroot(); print(round(float(root.attrib['line-rate']) * 100))")
+        echo "## Overall Code Coverage: ${COVERAGE}%" >> $GITHUB_STEP_SUMMARY
+        
+        if [ "$COVERAGE" -lt "60" ]; then
+          echo "⚠️ **Warning:** Coverage is below minimum threshold (60%)" >> $GITHUB_STEP_SUMMARY
+        elif [ "$COVERAGE" -lt "80" ]; then
+          echo "⚠️ Coverage is below target threshold (80%)" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "✅ Coverage meets or exceeds target threshold (80%)" >> $GITHUB_STEP_SUMMARY
+        fi
