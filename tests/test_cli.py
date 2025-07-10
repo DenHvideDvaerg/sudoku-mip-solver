@@ -69,6 +69,34 @@ class TestParseArguments:
         with pytest.raises(SystemExit):
             cli.parse_arguments()
 
+    def test_version_flag(self):
+        """Test that the --version flag exits with version information."""
+        from sudoku_mip_solver import __version__
+        
+        with pytest.raises(SystemExit) as excinfo:
+            set_argv(['--version'])
+            cli.parse_arguments()
+        
+        # The exit code should be 0 (success)
+        assert excinfo.value.code == 0
+
+    def test_version_output(self, capsys, monkeypatch):
+        """Test that --version outputs the correct version."""
+        from sudoku_mip_solver import __version__
+        
+        # Mock sys.exit to prevent actual exit
+        monkeypatch.setattr(sys, 'exit', lambda x: None)
+        
+        set_argv(['--version'])
+        try:
+            cli.parse_arguments()
+        except SystemExit:
+            pass
+        
+        # Check that version was printed to stdout
+        captured = capsys.readouterr()
+        assert f"cli.py {__version__}" in captured.out
+
 
 class TestValidateArguments:
     """Test cases for the validate_arguments function."""
@@ -251,3 +279,137 @@ class TestMainFunction:
         
         captured = capsys.readouterr()
         assert "Test error" in captured.err
+
+
+class TestMainGenerateOnly:
+    """Test cases for the main_generate_only function."""
+
+    @patch('sudoku_mip_solver.cli.generate_random_puzzle')
+    def test_main_generate_only(self, mock_generate, capsys):
+        """Test the main_generate_only function."""
+        mock_solver = MagicMock()
+        mock_board = [[1, 2], [3, 4]]
+        mock_solver.to_string.return_value = "1234"
+        mock_generate.return_value = (mock_solver, mock_board)
+        
+        args = argparse.Namespace(quiet=False, output=None)
+        cli.main_generate_only(args)
+        
+        mock_solver.to_string.assert_called_with(board=mock_board)
+        captured = capsys.readouterr()
+        assert "1234" in captured.out
+    
+    @patch('sudoku_mip_solver.cli.generate_random_puzzle')
+    @patch('sudoku_mip_solver.cli.save_to_file')
+    def test_main_generate_only_with_output(self, mock_save, mock_generate):
+        """Test main_generate_only with output to file."""
+        mock_solver = MagicMock()
+        mock_board = [[1, 2], [3, 4]]
+        mock_solver.to_string.return_value = "1234"
+        mock_generate.return_value = (mock_solver, mock_board)
+        
+        args = argparse.Namespace(quiet=True, output="puzzle.txt")
+        cli.main_generate_only(args)
+        
+        mock_save.assert_called_with("puzzle.txt", "1234", "generated puzzle")
+    
+    @patch('sudoku_mip_solver.cli.generate_random_puzzle')
+    def test_main_generate_only_quiet(self, mock_generate):
+        """Test main_generate_only with quiet option."""
+        mock_solver = MagicMock()
+        mock_board = [[1, 2], [3, 4]]
+        mock_generate.return_value = (mock_solver, mock_board)
+        
+        args = argparse.Namespace(quiet=True, output=None)
+        cli.main_generate_only(args)
+        
+        # Should not call to_string when quiet=True and no output
+        mock_solver.to_string.assert_not_called()
+
+
+class TestGenerateRandomPuzzle:
+    """Test cases for the generate_random_puzzle function."""
+    
+    @patch('sudoku_mip_solver.SudokuMIPSolver.generate_random_puzzle')
+    def test_generate_random_puzzle(self, mock_generate):
+        """Test generating a random puzzle."""
+        # Set up the mock
+        mock_solver = MagicMock()
+        mock_board = [[1, 2], [3, 4]]
+        mock_generate.return_value = (mock_solver, 0.5)
+        mock_solver.board = mock_board
+        mock_solver.size = len(mock_board)
+        
+        # Test arguments
+        args = argparse.Namespace(width=3, height=3, difficulty=0.5, non_unique=False, verbose=False, quiet=False)
+        
+        # Call the function
+        solver, board = cli.generate_random_puzzle(args)
+        
+        # Assert the results
+        assert solver == mock_solver
+        assert board == mock_board
+        
+        # Verify the expected calls were made
+        mock_generate.assert_called_once_with(
+            sub_grid_width=3, 
+            sub_grid_height=3, 
+            target_difficulty=0.5, 
+            unique_solution=True
+        )
+    
+    @patch('sudoku_mip_solver.SudokuMIPSolver.generate_random_puzzle')
+    def test_generate_random_puzzle_non_unique(self, mock_generate):
+        """Test generating a random puzzle with non-unique option."""
+        # Set up the mock
+        mock_solver = MagicMock()
+        mock_board = [[5, 6], [7, 8]]
+        mock_generate.return_value = (mock_solver, 0.8)
+        mock_solver.board = mock_board
+        mock_solver.size = len(mock_board)
+        
+        # Test arguments with non_unique=True
+        args = argparse.Namespace(width=2, height=2, difficulty=0.8, non_unique=True, verbose=False, quiet=False)
+        
+        # Call the function
+        solver, board = cli.generate_random_puzzle(args)
+        
+        # Assert the results
+        assert solver == mock_solver
+        assert board == mock_board
+        
+        # Verify the expected calls were made
+        mock_generate.assert_called_once_with(
+            sub_grid_width=2, 
+            sub_grid_height=2, 
+            target_difficulty=0.8, 
+            unique_solution=False
+        )
+    
+    @patch('sudoku_mip_solver.SudokuMIPSolver.generate_random_puzzle')
+    def test_generate_random_puzzle_default_height(self, mock_generate):
+        """Test generating a random puzzle with default height (None)."""
+        # Set up the mock
+        mock_solver = MagicMock()
+        mock_board = [[1, 2, 3], [4, 5, 6], [7, 8, 9]]
+        mock_generate.return_value = (mock_solver, 0.7)
+        mock_solver.board = mock_board
+        mock_solver.size = len(mock_board)
+        
+        # Test arguments with height=None (should default to width)
+        args = argparse.Namespace(width=3, height=None, difficulty=0.7, non_unique=False, verbose=False, quiet=False)
+        
+        # Call the function
+        solver, board = cli.generate_random_puzzle(args)
+        
+        # Assert the results
+        assert solver == mock_solver
+        assert board == mock_board
+        
+        # Verify the expected calls were made with the same value for width and height
+        mock_generate.assert_called_once_with(
+            sub_grid_width=3, 
+            sub_grid_height=3, 
+            target_difficulty=0.7, 
+            unique_solution=True
+        )
