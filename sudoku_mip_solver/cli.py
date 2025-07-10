@@ -1,8 +1,7 @@
-#!/usr/bin/env python3
 """
 Sudoku MIP Solver - Command Line Interface
 
-A tool for solving Sudoku puzzles using Mixed Integer Programming (MIP).
+Provides command-line functionality for the Sudoku MIP Solver package.
 """
 import argparse
 import time
