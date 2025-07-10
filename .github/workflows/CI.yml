@@ -41,7 +41,7 @@ jobs:
         
     - name: Test with pytest
       run: |
-        pytest --cov=sudoku_mip_solver --cov-report=term --cov-report=xml --cov-report=html
+        pytest tests/ --cov=sudoku_mip_solver --cov-config=.coveragerc --cov-report=term --cov-report=xml --cov-report=html
         
     # Only run coverage reporting steps for the specified Python version
     - name: Check coverage Python version
