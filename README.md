@@ -1,7 +1,7 @@
 # Sudoku MIP Solver
 
 [![CI](https://github.com/DenHvideDvaerg/sudoku-mip-solver/actions/workflows/CI.yml/badge.svg)](https://github.com/DenHvideDvaerg/sudoku-mip-solver/actions/workflows/CI.yml)
-[![Code Coverage](https://img.shields.io/badge/Code%20Coverage-see%20workflow-informational)](https://github.com/DenHvideDvaerg/sudoku-mip-solver/actions/workflows/CI.yml)
+[![Code Coverage](https://img.shields.io/badge/Code%20Coverage-see%20workflow-informational)](https://github.com/DenHvideDvaerg/sudoku-mip-solver/actions/workflows/CI.yml?query=branch%3Amain+is%3Asuccess)
 [![PyPI version](https://badge.fury.io/py/sudoku-mip-solver.svg)](https://pypi.org/project/sudoku-mip-solver/)
 
 A Sudoku puzzle solver and generator using Mixed Integer Programming (MIP).
