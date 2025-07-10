@@ -1,3 +1,9 @@
+"""
+Sudoku MIP Solver - Core Implementation
+
+Implements the SudokuMIPSolver class that handles all Sudoku solving operations.
+"""
+
 import pulp
 import random
 
@@ -37,7 +43,7 @@ class SudokuMIPSolver:
     def build_model(self):
         """Build the MIP model with all Sudoku constraints."""
         # Create the model
-        self.model = pulp.LpProblem("SudokuSolver",pulp.LpMinimize)
+        self.model = pulp.LpProblem("SudokuSolver", pulp.LpMinimize)
         
         # Create variables - x[row,column,value] = 1 if cell (row,column) has value
         self.variables = {}

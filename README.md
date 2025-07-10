@@ -1,9 +1,22 @@
 # Sudoku MIP Solver
 
 [![CI](https://github.com/DenHvideDvaerg/sudoku-mip-solver/actions/workflows/CI.yml/badge.svg)](https://github.com/DenHvideDvaerg/sudoku-mip-solver/actions/workflows/CI.yml)
-[![Code Coverage](https://img.shields.io/badge/Code%20Coverage-see%20workflow-informational)](https://github.com/DenHvideDvaerg/sudoku-mip-solver/actions/workflows/CI.yml)
+[![Code Coverage](https://img.shields.io/badge/Code%20Coverage-see%20workflow-informational)](https://github.com/DenHvideDvaerg/sudoku-mip-solver/actions/workflows/CI.yml?query=branch%3Amain+is%3Asuccess)
+[![PyPI version](https://badge.fury.io/py/sudoku-mip-solver.svg)](https://pypi.org/project/sudoku-mip-solver/)
 
 A Sudoku puzzle solver and generator using Mixed Integer Programming (MIP).
+
+## Table of Contents
+- [Features](#features)
+- [Installation](#installation)
+- [Requirements](#requirements)
+- [Quick Start](#quick-start)
+- [Command Line Interface](#command-line-interface)
+- [SudokuMIPSolver API](#sudokumipsolver-api)
+- [Examples](#examples)
+- [License](#license)
+
+## Features
 
 This package provides tools to:
 - Solve Sudoku puzzles of any size using MIP optimization techniques
@@ -54,23 +67,26 @@ The package includes a command-line interface for solving and generating puzzles
 ### Basic Usage
 
 ```bash
+# Display the version of the package
+sudoku-mip-solver --version
+
 # Solve a puzzle provided as a string
-python -m sudoku_mip_solver -s "530070000600195000098000060800060003400803001700020006060000280000419005000080079"
+sudoku-mip-solver -s "530070000600195000098000060800060003400803001700020006060000280000419005000080079"
 
 # Read a puzzle from a file
-python -m sudoku_mip_solver -f puzzle.txt
+sudoku-mip-solver -f puzzle.txt
 
 # Generate a random puzzle with medium difficulty
-python -m sudoku_mip_solver
+sudoku-mip-solver
 
 # Generate but don't solve a puzzle
-python -m sudoku_mip_solver --generate-only
+sudoku-mip-solver --generate-only
 
 # Find all solutions to a puzzle
-python -m sudoku_mip_solver -f puzzle.txt -m -1
+sudoku-mip-solver -f puzzle.txt -m -1
 
 # Solve a non-standard 6x6 puzzle (2x3 sub-grids)
-python -m sudoku_mip_solver -s "530070600195098000" -w 2 -H 3
+sudoku-mip-solver -s "530070600195098000" -w 2 -H 3
 ```
 
 ### Command Line Options
@@ -110,6 +126,7 @@ python -m sudoku_mip_solver -s "530070600195098000" -w 2 -H 3
 | `-o`, `--output` | Save the solution or generated puzzle to a file |
 | `-v`, `--verbose` | Show detailed solver information |
 | `-q`, `--quiet` | Suppress all output except error messages |
+| `--version` | Display the version number of the package |
 
 ## SudokuMIPSolver API
 
@@ -160,6 +177,26 @@ solver, difficulty = SudokuMIPSolver.generate_random_puzzle(
 | ------ | ----------- |
 | `from_string(sudoku_string, sub_grid_width=3, sub_grid_height=None, delimiter=None)` | Create solver from string representation |
 | `generate_random_puzzle(sub_grid_width=3, sub_grid_height=None, target_difficulty=0.75, unique_solution=True, max_attempts=100, random_seed=None)` | Generate a random puzzle with specified parameters |
+
+### Algorithm Details
+
+The solver uses Mixed Integer Programming (MIP) to model and solve Sudoku puzzles:
+
+1. **Decision Variables**: Binary variables x[i,j,k] representing whether cell (i,j) contains value k
+2. **Constraints**:
+   - Each cell must contain exactly one value
+   - Each row must contain all values exactly once
+   - Each column must contain all values exactly once
+   - Each sub-grid must contain all values exactly once
+   - Initial clues are fixed to their given values
+3. **Solution Finding**: 
+   - The MIP solver (provided by PuLP) finds a feasible solution satisfying all constraints
+   - For multiple solutions, solution cuts are added to exclude previously found solutions
+
+The random puzzle generator works by:
+1. Creating a complete, solved Sudoku grid
+2. Systematically removing values while ensuring the puzzle maintains a unique solution
+3. Continuing removal until the target difficulty level is reached
 
 ## Examples
 
