@@ -1,0 +1,16 @@
+[run]
+source = sudoku_mip_solver
+omit = 
+    tests/*
+    */tests/*
+    */__pycache__/*
+    */site-packages/*
+    
+[report]
+exclude_lines =
+    pragma: no cover
+    def __repr__
+    raise NotImplementedError
+    if __name__ == .__main__.:
+    pass
+    raise ImportError
