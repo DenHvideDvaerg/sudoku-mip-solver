@@ -7,12 +7,20 @@ import argparse
 import time
 import sys
 from sudoku_mip_solver import SudokuMIPSolver
+from sudoku_mip_solver import __version__
 
 
 def parse_arguments():
     """Parse command line arguments."""
     parser = argparse.ArgumentParser(
         description="Solve Sudoku puzzles using Mixed Integer Programming"
+    )
+    
+    # Version information
+    parser.add_argument(
+        '--version',
+        action='version',
+        version=f'%(prog)s {__version__}'
     )
     
     # Input options
