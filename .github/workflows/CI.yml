@@ -9,6 +9,7 @@ on:
     paths:
       - '**.py'  # Run on any Python file changes
       - 'requirements.txt'  # Run when requirements change
+      - '.github/workflows/**'  # Run on GitHub Actions workflow changes
   workflow_dispatch:  # Allow manual triggering
 
 jobs:
