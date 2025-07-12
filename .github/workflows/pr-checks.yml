@@ -31,10 +31,12 @@ jobs:
     
     # Download coverage artifacts from CI workflow
     - name: Download coverage XML
-      uses: actions/download-artifact@v4
+      uses: dawidd6/action-download-artifact@v3
       with:
+        workflow: CI.yml
+        commit: ${{ github.event.pull_request.head.sha }}
         name: coverage-xml
-        github-token: ${{ secrets.GITHUB_TOKEN }}
+        github_token: ${{ secrets.GITHUB_TOKEN }}
         
     - name: Code Coverage Summary
       uses: irongut/CodeCoverageSummary@v1.3.0
