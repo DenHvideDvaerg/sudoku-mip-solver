@@ -1027,3 +1027,58 @@ class TestSudokuMIPSolverRandomPuzzle:
         # Should still return a valid puzzle even if it couldn't meet the difficulty target
         assert isinstance(solver, SudokuMIPSolver)
         assert solver.solve()
+
+
+class TestSudokuMIPSolverPrettyPrint:
+    """Test cases for pretty print functionality."""
+
+    def test_get_pretty_string_with_solution(self):
+        """Test that get_pretty_string returns formatted string for solved puzzle."""
+        # Simple 4x4 puzzle for easier testing
+        board = [
+            [1, 2, None, None],
+            [3, 4, None, None],
+            [None, None, 3, 4],
+            [None, None, 1, 2]
+        ]
+        solver = SudokuMIPSolver(board, 2, 2)
+        solver.solve()
+        
+        pretty_str = solver.get_pretty_string()
+        
+        # Check that it's a string
+        assert isinstance(pretty_str, str)
+        
+        # Check that it contains the expected structure
+        assert "+" in pretty_str  # Horizontal separators
+        assert "|" in pretty_str  # Vertical separators
+        assert "1" in pretty_str and "2" in pretty_str and "3" in pretty_str and "4" in pretty_str
+        
+        # Check that it contains newlines (multi-line output)
+        assert "\n" in pretty_str
+        
+        lines = pretty_str.split("\n")
+        assert len(lines) > 4  # Should have multiple lines including separators
+
+    def test_get_pretty_string_with_explicit_board(self):
+        """Test that get_pretty_string works with explicitly provided board."""
+        board = [
+            [1, 2, 3, 4],
+            [3, 4, 1, 2],
+            [2, 1, 4, 3],
+            [4, 3, 2, 1]
+        ]
+        solver = SudokuMIPSolver(board, 2, 2)
+        
+        pretty_str = solver.get_pretty_string(board)
+        
+        assert isinstance(pretty_str, str)
+        assert "1" in pretty_str and "2" in pretty_str and "3" in pretty_str and "4" in pretty_str
+
+    def test_get_pretty_string_no_solution_raises_error(self):
+        """Test that get_pretty_string raises error when no solution available."""
+        board = [[None for _ in range(4)] for _ in range(4)]
+        solver = SudokuMIPSolver(board, 2, 2)
+        
+        with pytest.raises(ValueError, match="No solution available to format"):
+            solver.get_pretty_string()
