@@ -608,6 +608,53 @@ class SudokuMIPSolver:
         
         return cls(board, sub_grid_width, sub_grid_height)
     
+    def get_pretty_string(self, board=None):
+        """
+        Get the pretty-printed Sudoku board as a string with grid lines showing sub-grids.
+        
+        Parameters:
+        - board: The board to format. If None, uses the current solution.
+        
+        Returns:
+        - str: Formatted board string with grid lines
+        """
+        if board is None:
+            if self.current_solution is None:
+                raise ValueError("No solution available to format")
+            board = self.current_solution
+        
+        # Determine characters needed for each cell based on puzzle size
+        cell_width = len(str(self.size)) + 1  # +1 for spacing
+        
+        # Horizontal separator for sub-grids
+        h_separator = "+" + "+".join(["-" * (cell_width * self.sub_grid_width) for _ in range(self.sub_grid_height)]) + "+"
+        
+        lines = []
+        
+        for r in range(self.size):
+            # Add horizontal separator at the beginning of each sub-grid row
+            if r % self.sub_grid_height == 0:
+                lines.append(h_separator)
+            
+            row_str = ""
+            for c in range(self.size):
+                # Add vertical separator at the beginning of each sub-grid column
+                if c % self.sub_grid_width == 0:
+                    row_str += "|"
+                
+                # Get the value, ensure it's right-aligned within its cell width
+                value = board[r][c] if board[r][c] is not None else "."
+                row_str += f"{value}".rjust(cell_width)
+            
+            # End the row with a vertical separator
+            row_str += "|"
+            lines.append(row_str)
+        
+        # Add horizontal separator at the end
+        lines.append(h_separator)
+        
+        return "\n".join(lines)
+    
     def pretty_print(self, board=None):
         """
         Pretty print the Sudoku board with grid lines showing sub-grids.
@@ -618,35 +665,4 @@ class SudokuMIPSolver:
         Returns:
         - None (prints to console)
         """
-        if board is None:
-            if self.current_solution is None:
-                raise ValueError("No solution available to print")
-            board = self.current_solution
-        
-        # Determine characters needed for each cell based on puzzle size
-        cell_width = len(str(self.size)) + 1  # +1 for spacing
-        
-        # Horizontal separator for sub-grids
-        h_separator = "+" + "+".join(["-" * (cell_width * self.sub_grid_width) for _ in range(self.sub_grid_height)]) + "+"
-        
-        for r in range(self.size):
-            # Print horizontal separator at the beginning of each sub-grid row
-            if r % self.sub_grid_height == 0:
-                print(h_separator)
-            
-            row_str = ""
-            for c in range(self.size):
-                # Print vertical separator at the beginning of each sub-grid column
-                if c % self.sub_grid_width == 0:
-                    row_str += "|"
-                
-                # Get the value, ensure it's right-aligned within its cell width
-                value = board[r][c] if board[r][c] is not None else "."
-                row_str += f"{value}".rjust(cell_width)
-            
-            # End the row with a vertical separator
-            row_str += "|"
-            print(row_str)
-        
-        # Print horizontal separator at the end
-        print(h_separator)
+        print(self.get_pretty_string(board))

@@ -167,6 +167,7 @@ solver, difficulty = SudokuMIPSolver.generate_random_puzzle(
 | Method | Description |
 | ------ | ----------- |
 | `to_string(board=None, delimiter=None)` | Convert board to string representation |
+| `get_pretty_string(board=None)` | Get the board as a formatted string with grid lines showing sub-grids |
 | `pretty_print(board=None)` | Print the board with grid lines showing sub-grids |
 | `extract_solution()` | Extract solution from model variables |
 | `print_model()` | Print the model in a readable format |
@@ -208,6 +209,24 @@ puzzle = "5300700006001950000980000608000600034008030017000200060600002800004190
 solver = SudokuMIPSolver.from_string(puzzle)
 solver.solve()
 solver.pretty_print(solver.get_solution())
+```
+
+### Getting Formatted Output as String
+
+```python
+# Get the formatted puzzle as a string instead of printing directly
+puzzle = "530070000600195000098000060800060003400803001700020006060000280000419005000080079"
+solver = SudokuMIPSolver.from_string(puzzle)
+solver.solve()
+
+# Get the formatted string
+formatted_solution = solver.get_pretty_string(solver.get_solution())
+print("Solution:")
+print(formatted_solution)
+
+# You can also save it to a file or process it further
+with open("solution.txt", "w") as f:
+    f.write(formatted_solution)
 ```
 
 ### Finding Multiple Solutions
