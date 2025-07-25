@@ -8,6 +8,10 @@
 
 A Sudoku puzzle solver and generator using Mixed Integer Programming (MIP).
 
+## Try It Online
+
+🚀 **[Interactive Sudoku Dashboard](https://sudoku-dashboard.streamlit.app/)** - Try the solver in your browser with a user-friendly interface built with Streamlit!
+
 ## Table of Contents
 - [Features](#features)
 - [Installation](#installation)
@@ -25,10 +29,6 @@ This package provides tools to:
 - Generate random Sudoku puzzles with varying difficulty levels
 - Find all possible solutions for a given puzzle
 - Support non-standard Sudoku grid dimensions (e.g., 12x12 with 4x3 sub-grids)
-
-## Try It Online
-
-🚀 **[Interactive Sudoku Dashboard](https://sudoku-dashboard.streamlit.app/)** - Try the solver in your browser with a user-friendly interface built with Streamlit!
 
 ## Installation
 
