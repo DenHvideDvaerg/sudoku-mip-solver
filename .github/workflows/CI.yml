@@ -60,4 +60,5 @@ jobs:
       if: matrix.python-version == env.COVERAGE_PYTHON_VERSION
       with:
         file: coverage.xml
+        token: ${{ secrets.CODECOV_TOKEN }}
         fail_ci_if_error: false
