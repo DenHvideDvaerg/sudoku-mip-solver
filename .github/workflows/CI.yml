@@ -54,3 +54,10 @@ jobs:
         name: coverage-html
         path: htmlcov/
         retention-days: 1
+        
+    - name: Upload to Codecov
+      uses: codecov/codecov-action@v4
+      if: matrix.python-version == env.COVERAGE_PYTHON_VERSION
+      with:
+        file: coverage.xml
+        fail_ci_if_error: false
